@@ -9,9 +9,19 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'Exploding Kittens',
-  description: 'Play Exploding Kittens online with friends or against the computer!',
+  title: 'Exploding Kittens - Play Online',
+  description: 'Play Exploding Kittens online with friends or against the computer! Free, no downloads needed.',
   icons: { icon: '/favicon.svg' },
+  openGraph: {
+    title: 'Exploding Kittens - Play Online',
+    description: 'Play Exploding Kittens online with friends or against the computer!',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Exploding Kittens - Play Online',
+    description: 'Play Exploding Kittens online with friends or against the computer!',
+  },
 };
 
 export const viewport: Viewport = {

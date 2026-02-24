@@ -95,7 +95,7 @@ export const CARD_INFO: Record<CardType, { name: string; description: string; em
   skip: {
     name: 'Skip',
     description: 'End your turn without drawing a card.',
-    emoji: '🚫',
+    emoji: '⏭️',
     color: '#4488FF',
   },
   favor: {
@@ -119,7 +119,7 @@ export const CARD_INFO: Record<CardType, { name: string; description: string; em
   nope: {
     name: 'Nope',
     description: 'Cancel any action card played by another player.',
-    emoji: '🚫',
+    emoji: '✋',
     color: '#888888',
   },
   taco_cat: {
