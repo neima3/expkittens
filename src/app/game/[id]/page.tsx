@@ -363,15 +363,28 @@ export default function GamePage() {
             </p>
           </motion.div>
 
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(game.code);
-              toast.success('Code copied!');
-            }}
-            className="text-accent hover:underline mb-8 text-sm"
-          >
-            Copy to clipboard
-          </button>
+          <div className="flex justify-center gap-4 mb-8">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(game.code);
+                toast.success('Code copied!');
+              }}
+              className="text-accent hover:underline text-sm"
+            >
+              Copy Code
+            </button>
+            <span className="text-border">|</span>
+            <button
+              onClick={() => {
+                const url = window.location.origin + '?join=' + game.code;
+                navigator.clipboard.writeText(url);
+                toast.success('Link copied!');
+              }}
+              className="text-accent hover:underline text-sm"
+            >
+              Copy Invite Link
+            </button>
+          </div>
 
           <div className="space-y-2 mb-8">
             <p className="text-sm text-text-muted">Players ({game.players.length}/5):</p>
@@ -641,9 +654,16 @@ export default function GamePage() {
               : 'bg-surface-light text-text-muted'
           }`}
         >
-          {isMyTurn ? 'Your Turn!' : `${currentPlayer?.name}'s Turn`}
-          {game.turnsRemaining > 1 && (
-            <span className="ml-1 text-warning">({game.turnsRemaining} turns left)</span>
+          {isMyTurn ? (
+            <>Your Turn! {game.turnsRemaining > 1 && <span className="ml-1 text-warning">({game.turnsRemaining} turns left)</span>}</>
+          ) : (
+            <span className="flex items-center gap-2">
+              {currentPlayer?.name}&apos;s Turn
+              {currentPlayer?.isAI && actionLoading && (
+                <span className="w-3 h-3 border-2 border-text-muted border-t-transparent rounded-full animate-spin" />
+              )}
+              {game.turnsRemaining > 1 && <span className="text-warning">({game.turnsRemaining} turns)</span>}
+            </span>
           )}
         </motion.div>
 
@@ -664,6 +684,23 @@ export default function GamePage() {
         </div>
       </div>
 
+      {/* Eliminated overlay */}
+      {myPlayer && !myPlayer.isAlive && game.status === 'playing' && (
+        <div className="absolute inset-0 bg-black/50 z-30 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-6xl mb-4">💀</p>
+            <p className="text-2xl font-bold text-danger mb-2">You Exploded!</p>
+            <p className="text-text-muted mb-4">Watch the game continue...</p>
+            <button
+              onClick={() => router.push('/')}
+              className="px-6 py-2 rounded-xl bg-surface-light border border-border text-text hover:border-accent transition-colors"
+            >
+              Leave Game
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Player status bar */}
       <div className="bg-surface/90 backdrop-blur border-t border-border">
         {/* My info */}
@@ -671,8 +708,12 @@ export default function GamePage() {
           <div className="flex items-center gap-2">
             <span className="text-2xl">{AVATARS[myPlayer?.avatar || 0]}</span>
             <div>
-              <p className="font-bold text-sm leading-none">{myPlayer?.name || 'You'}</p>
-              <p className="text-xs text-text-muted">{myPlayer?.hand.length} cards</p>
+              <p className={`font-bold text-sm leading-none ${myPlayer && !myPlayer.isAlive ? 'line-through text-danger' : ''}`}>
+                {myPlayer?.name || 'You'}
+              </p>
+              <p className="text-xs text-text-muted">
+                {myPlayer?.isAlive ? `${myPlayer?.hand.length} cards` : '💀 Eliminated'}
+              </p>
             </div>
           </div>
 

@@ -2,20 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { toast } from 'sonner';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter();
-  const [screen, setScreen] = useState<'home' | 'setup' | 'join'>('home');
+  const searchParams = useSearchParams();
+  const joinParam = searchParams.get('join');
+  const [screen, setScreen] = useState<'home' | 'setup' | 'join'>(joinParam ? 'join' : 'home');
   const [playerName, setPlayerName] = useState('');
   const [avatar, setAvatar] = useState(0);
   const [mode, setMode] = useState<'ai' | 'multiplayer'>('ai');
   const [aiCount, setAiCount] = useState(1);
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -353,5 +356,17 @@ export default function Home() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }
