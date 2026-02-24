@@ -11,7 +11,7 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: 'Exploding Kittens',
   description: 'Play Exploding Kittens online with friends or against the computer!',
-  icons: { icon: '/favicon.ico' },
+  icons: { icon: '/favicon.svg' },
 };
 
 export const viewport: Viewport = {

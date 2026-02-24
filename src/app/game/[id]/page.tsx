@@ -12,6 +12,7 @@ import OpponentBar from '@/components/game/OpponentBar';
 import DrawPile from '@/components/game/DrawPile';
 import DiscardPile from '@/components/game/DiscardPile';
 import GameLog from '@/components/game/GameLog';
+import ThreeOfKindModal from '@/components/game/ThreeOfKindModal';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
@@ -269,19 +270,18 @@ export default function GamePage() {
     sendAction({ type: 'draw' });
   }
 
+  // Handle three-of-kind selection from modal
+  function handleThreeOfKindSelect(targetId: string, cardType: CardType) {
+    sendAction({
+      type: 'three_of_kind_target',
+      targetPlayerId: targetId,
+      targetCardType: cardType,
+    });
+    setSelectingThreeTarget(false);
+  }
+
   // Handle target player selection
   function handleTargetSelect(targetId: string) {
-    if (selectingThreeTarget) {
-      // Need to also pick a card type - just ask for defuse for simplicity
-      // TODO: show card type picker
-      sendAction({
-        type: 'three_of_kind_target',
-        targetPlayerId: targetId,
-        targetCardType: 'defuse',
-      });
-      setSelectingThreeTarget(false);
-      return;
-    }
 
     if (game?.pendingAction?.type === 'steal_target') {
       sendAction({ type: 'steal_target', targetPlayerId: targetId });
@@ -408,7 +408,7 @@ export default function GamePage() {
   }
 
   // Active game
-  const selectableTargets = selectingTarget || selectingThreeTarget
+  const selectableTargets = selectingTarget
     ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
     : undefined;
 
@@ -573,6 +573,14 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
+      {/* Three of a Kind modal */}
+      <ThreeOfKindModal
+        show={selectingThreeTarget}
+        targets={game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0)}
+        onSelect={handleThreeOfKindSelect}
+        onCancel={() => setSelectingThreeTarget(false)}
+      />
+
       {/* Top bar - opponents */}
       <div className="bg-surface/90 backdrop-blur border-b border-border px-2 py-2">
         <OpponentBar
@@ -669,7 +677,19 @@ export default function GamePage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {selectedCard && (
+              <AnimatePresence>
+                <motion.span
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-xs text-text-muted max-w-[120px] truncate hidden sm:block"
+                >
+                  {CARD_INFO[selectedCard.type].description}
+                </motion.span>
+              </AnimatePresence>
+            )}
             {(canPlaySingle || canPlayPair || canPlayTriple) && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -678,9 +698,9 @@ export default function GamePage() {
                 whileTap={{ scale: 0.95 }}
                 onClick={playSelected}
                 disabled={!canPlay}
-                className="px-4 py-2 rounded-xl bg-accent text-white font-bold text-sm disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-accent text-white font-bold text-sm disabled:opacity-50 whitespace-nowrap"
               >
-                {canPlayPair ? 'Play Pair' : canPlayTriple ? 'Play Triple' : 'Play Card'}
+                {canPlayPair ? 'Play Pair' : canPlayTriple ? 'Play Triple' : `Play ${CARD_INFO[selectedCard!.type].name}`}
               </motion.button>
             )}
             {selectedCards.length > 0 && (

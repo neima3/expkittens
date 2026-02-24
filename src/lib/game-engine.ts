@@ -210,8 +210,10 @@ export function processAction(game: GameState, action: GameAction): GameState {
         });
         if (!allSameType) throw new Error('All three cards must match');
 
+        // Collect cards before removing them
+        const removedCards = action.cardIds.map(id => player.hand.find(c => c.id === id)!).filter(Boolean);
         player.hand = player.hand.filter(c => !action.cardIds!.includes(c.id));
-        state.discardPile.push(...action.cardIds.map(id => player.hand.find(c => c.id === id) || card));
+        state.discardPile.push(...removedCards);
 
         state.pendingAction = {
           type: 'three_of_kind_target',

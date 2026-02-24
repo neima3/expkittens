@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { toast } from 'sonner';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
@@ -16,6 +17,13 @@ export default function Home() {
   const [aiCount, setAiCount] = useState(1);
   const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const savedName = localStorage.getItem('ek_playerName');
+    const savedAvatar = localStorage.getItem('ek_avatar');
+    if (savedName) setPlayerName(savedName);
+    if (savedAvatar) setAvatar(parseInt(savedAvatar));
+  }, []);
 
   async function createGame() {
     if (!playerName.trim()) {
@@ -153,6 +161,13 @@ export default function Home() {
                 🔗 Join with Code
               </motion.button>
             </div>
+
+            <Link
+              href="/rules"
+              className="text-text-muted hover:text-accent transition-colors text-sm mt-6 inline-block"
+            >
+              How to Play →
+            </Link>
           </motion.div>
         )}
 
