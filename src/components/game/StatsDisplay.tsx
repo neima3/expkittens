@@ -38,9 +38,9 @@ export default function StatsDisplay({ show, onClose }: StatsDisplayProps) {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, y: 30 }}
             onClick={e => e.stopPropagation()}
-            className="bg-surface rounded-3xl p-6 max-w-sm w-full border-2 border-accent"
+            className="glass-panel rounded-3xl p-6 max-w-sm w-full border-2 border-accent"
           >
-            <h3 className="text-2xl font-black mb-6 text-center bg-gradient-to-r from-accent to-warning bg-clip-text text-transparent">
+            <h3 className="display-font text-2xl mb-6 text-center bg-gradient-to-r from-accent to-warning bg-clip-text text-transparent">
               Your Stats
             </h3>
 
@@ -80,7 +80,7 @@ function StatBox({
   emoji?: string;
 }) {
   return (
-    <div className="bg-surface-light rounded-xl p-3 text-center border border-border">
+    <div className="bg-surface-light/80 rounded-xl p-3 text-center border border-border">
       {emoji && <span className="text-lg">{emoji}</span>}
       <p className="text-2xl font-black" style={color ? { color } : undefined}>
         {value}

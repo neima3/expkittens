@@ -1,30 +1,156 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0f0f23;
-  --color-surface: #1a1a2e;
-  --color-surface-light: #25253f;
-  --color-accent: #ff6b35;
-  --color-accent-hover: #ff8855;
-  --color-danger: #ff4444;
-  --color-success: #44bb44;
-  --color-warning: #ffbb33;
-  --color-text: #e8e8f0;
-  --color-text-muted: #8888aa;
-  --color-border: #333355;
-  --font-game: 'Nunito', system-ui, sans-serif;
+  --color-bg: #110f1d;
+  --color-surface: #18122b;
+  --color-surface-light: #251a3e;
+  --color-accent: #ff5f2e;
+  --color-accent-hover: #ff844f;
+  --color-danger: #ff4363;
+  --color-success: #43d089;
+  --color-warning: #ffc658;
+  --color-text: #f8f6ff;
+  --color-text-muted: #b1abca;
+  --color-border: #443468;
+  --font-game: 'Space Grotesk', system-ui, sans-serif;
+  --font-display: 'Bungee', 'Space Grotesk', system-ui, sans-serif;
 }
 
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 body {
   font-family: var(--font-game);
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 95, 46, 0.24), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(67, 208, 137, 0.2), transparent 30%),
+    radial-gradient(circle at 50% 90%, rgba(91, 145, 255, 0.16), transparent 44%),
+    linear-gradient(145deg, #0f0c19 0%, #110f1d 38%, #151126 100%);
   color: var(--color-text);
   overscroll-behavior: none;
   min-height: 100dvh;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.25;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.92), transparent 95%);
+  z-index: -1;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: -140px;
+  pointer-events: none;
+  opacity: 0.3;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 12px 12px;
+  filter: blur(0.3px);
+  z-index: -1;
+}
+
+a,
+button {
+  transition: all 0.2s ease;
+}
+
+.display-font {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+}
+
+.glass-panel {
+  background: linear-gradient(165deg, rgba(37, 26, 62, 0.86), rgba(24, 18, 43, 0.9));
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, white 14%);
+  box-shadow:
+    0 22px 48px rgba(10, 6, 20, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white 20%);
+  background: rgba(22, 17, 39, 0.75);
+}
+
+.cta-primary,
+.cta-secondary,
+.cta-ghost {
+  border-radius: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.cta-primary {
+  color: white;
+  background: linear-gradient(110deg, var(--color-accent) 0%, #ff8d44 100%);
+  box-shadow: 0 14px 30px rgba(255, 95, 46, 0.32);
+}
+
+.cta-primary:hover {
+  box-shadow: 0 18px 34px rgba(255, 95, 46, 0.4);
+}
+
+.cta-secondary {
+  color: #fff;
+  background: linear-gradient(115deg, #20a4f3 0%, #2fd19f 100%);
+  box-shadow: 0 14px 30px rgba(38, 170, 213, 0.28);
+}
+
+.cta-secondary:hover {
+  box-shadow: 0 18px 34px rgba(38, 170, 213, 0.38);
+}
+
+.cta-ghost {
+  color: var(--color-text);
+  background: rgba(37, 26, 62, 0.72);
+  border: 1px solid var(--color-border);
+}
+
+.cta-ghost:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, white 40%);
+  background: rgba(45, 31, 75, 0.82);
+}
+
+.table-aura {
+  position: relative;
+  overflow: hidden;
+}
+
+.table-aura::before {
+  content: '';
+  position: absolute;
+  inset: -30% -20%;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 95, 46, 0.14), transparent 42%),
+    radial-gradient(circle at 68% 76%, rgba(67, 208, 137, 0.12), transparent 44%);
+  pointer-events: none;
+}
+
+.subtle-text {
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 /* Card flip animation */
@@ -57,6 +183,19 @@ body {
   50% { transform: translateY(-6px); }
 }
 
+.animate-slow-spin {
+  animation: spin 16s linear infinite;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-9px) translateX(6px); }
+}
+
+.animate-drift {
+  animation: drift 6.5s ease-in-out infinite;
+}
+
 .animate-deal { animation: cardDeal 0.4s ease-out; }
 .animate-explode { animation: explode 0.8s ease-out forwards; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
@@ -71,8 +210,11 @@ body {
 
 /* Subtle dot grid background for game area */
 .game-bg {
-  background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background:
+    radial-gradient(circle at 40% 20%, rgba(255, 95, 46, 0.16), transparent 35%),
+    radial-gradient(circle at 65% 76%, rgba(67, 208, 137, 0.12), transparent 45%),
+    radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: auto, auto, 26px 26px;
 }
 
 /* Mobile safe area */

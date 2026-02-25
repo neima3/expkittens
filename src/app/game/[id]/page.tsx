@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import type { GameState, Card, CardType, Player } from '@/types/game';
 import { CARD_INFO, CAT_CARD_TYPES } from '@/types/game';
@@ -27,10 +27,42 @@ function isCatCard(type: CardType): boolean {
   return CAT_CARD_TYPES.includes(type);
 }
 
+function getActionHint({
+  isMyTurn,
+  hasPendingAction,
+  selectingTarget,
+  selectingThreeTarget,
+  favorGiveMode,
+  canPlay,
+  selectedCards,
+  actionLoading,
+}: {
+  isMyTurn: boolean;
+  hasPendingAction: boolean;
+  selectingTarget: boolean;
+  selectingThreeTarget: boolean;
+  favorGiveMode: boolean;
+  canPlay: boolean;
+  selectedCards: string[];
+  actionLoading: boolean;
+}): string {
+  if (actionLoading) return 'Resolving action...';
+  if (favorGiveMode) return 'You owe a Favor. Pick one card from your hand to give.';
+  if (selectingThreeTarget) return 'Pick a target and name a card to complete your triple combo.';
+  if (selectingTarget) return 'Pick an opponent to steal from.';
+  if (hasPendingAction) return 'Finish the current prompt to continue.';
+  if (!isMyTurn) return 'Watch opponents and plan your next combo.';
+  if (selectedCards.length === 0) return 'Select cards to play, or draw to end your turn.';
+  if (canPlay) return 'You can play now or keep building a stronger combo.';
+  return 'Selected cards are not a playable combo yet.';
+}
+
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const gameId = params.id as string;
+  const playerIdParam = searchParams.get('playerId');
   const [game, setGame] = useState<GameState | null>(null);
   const [playerId, setPlayerId] = useState<string>('');
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
@@ -184,14 +216,15 @@ export default function GamePage() {
 
   // Initialize
   useEffect(() => {
-    const pid = localStorage.getItem(`ek_player_${gameId}`);
+    const pid = localStorage.getItem(`ek_player_${gameId}`) || playerIdParam;
     if (!pid) {
       router.push('/');
       return;
     }
+    localStorage.setItem(`ek_player_${gameId}`, pid);
     setPlayerId(pid);
     fetchGame(pid);
-  }, [gameId, fetchGame, router]);
+  }, [gameId, fetchGame, playerIdParam, router]);
 
   // Polling — stable interval, poll callback uses refs to read latest state
   useEffect(() => {
@@ -219,6 +252,65 @@ export default function GamePage() {
     }, 15000);
     return () => clearTimeout(timeout);
   }, [actionLoading, fetchGame]);
+
+  // Expose deterministic hooks for browser automation and text-state validation.
+  useEffect(() => {
+    const stateToText = () => JSON.stringify({
+      coordinateSystem: 'N/A (card table)',
+      gameId,
+      status: game?.status ?? 'missing',
+      code: game?.code ?? null,
+      playersAlive: game?.players.filter(p => p.isAlive).length ?? 0,
+      deckCount: game?.deck.length ?? 0,
+      discardTop: game?.discardPile.at(-1)?.type ?? null,
+      currentPlayerId: currentPlayer?.id ?? null,
+      currentPlayerName: currentPlayer?.name ?? null,
+      myPlayerId: playerId || null,
+      myState: myPlayer
+        ? {
+            isAlive: myPlayer.isAlive,
+            handCount: myPlayer.hand.length,
+            handTypes: myPlayer.hand.map(card => card.type),
+          }
+        : null,
+      turnsRemaining: game?.turnsRemaining ?? 0,
+      pendingAction: game?.pendingAction?.type ?? null,
+      selectedCards,
+      ui: {
+        selectingTarget,
+        selectingThreeTarget,
+        showSeeFuture,
+        showDefuseModal,
+        showWinner,
+      },
+    });
+
+    const win = window as Window & {
+      render_game_to_text?: () => string;
+      advanceTime?: (ms: number) => Promise<void>;
+    };
+
+    win.render_game_to_text = stateToText;
+    win.advanceTime = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+
+    return () => {
+      delete win.render_game_to_text;
+      delete win.advanceTime;
+    };
+  }, [
+    currentPlayer?.id,
+    currentPlayer?.name,
+    game,
+    gameId,
+    myPlayer,
+    playerId,
+    selectedCards,
+    selectingTarget,
+    selectingThreeTarget,
+    showDefuseModal,
+    showSeeFuture,
+    showWinner,
+  ]);
 
   // Send action
   async function sendAction(actionData: Record<string, unknown>) {
@@ -418,24 +510,54 @@ export default function GamePage() {
   if (game.status === 'waiting') {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center p-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-md w-full text-center">
-          <h2 className="text-3xl font-bold mb-2">Waiting for Players</h2>
-          <p className="text-text-muted mb-6">Share this code with friends:</p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8 text-center"
+        >
+          <span className="status-pill mb-4">Lobby Open</span>
+          <h2 className="display-font text-3xl text-warning mb-2">Invite Your Friends</h2>
+          <p className="text-text-muted mb-5">Share this code and fill the table.</p>
 
-          <motion.div className="bg-surface-light border-2 border-accent rounded-2xl p-6 mb-6" animate={{ borderColor: ['#ff6b35', '#ff8855', '#ff6b35'] }} transition={{ duration: 2, repeat: Infinity }}>
-            <p className="text-5xl font-mono font-black tracking-[0.4em] text-accent">{game.code}</p>
+          <motion.div
+            className="bg-surface-light/80 border-2 border-accent rounded-2xl p-5 mb-5"
+            animate={{ borderColor: ['#ff5f2e', '#ff844f', '#ff5f2e'] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <p className="text-4xl md:text-5xl font-mono font-black tracking-[0.38em] text-accent">{game.code}</p>
           </motion.div>
 
-          <div className="flex justify-center gap-4 mb-8">
-            <button onClick={() => { navigator.clipboard.writeText(game.code); toast.success('Code copied!'); }} className="text-accent hover:underline text-sm">Copy Code</button>
-            <span className="text-border">|</span>
-            <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '?join=' + game.code); toast.success('Link copied!'); }} className="text-accent hover:underline text-sm">Copy Invite Link</button>
+          <div className="grid grid-cols-2 gap-2 mb-6">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(game.code);
+                toast.success('Code copied');
+              }}
+              className="cta-ghost py-2 text-sm"
+            >
+              Copy Code
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}?join=${game.code}`);
+                toast.success('Invite link copied');
+              }}
+              className="cta-ghost py-2 text-sm"
+            >
+              Copy Invite Link
+            </button>
           </div>
 
-          <div className="space-y-2 mb-8">
-            <p className="text-sm text-text-muted">Players ({game.players.length}/5):</p>
+          <div className="space-y-2 mb-6">
+            <p className="text-sm text-text-muted text-left">Players ({game.players.length}/5)</p>
             {game.players.map((p, i) => (
-              <motion.div key={p.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="flex items-center gap-3 bg-surface-light rounded-xl p-3">
+              <motion.div
+                key={p.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="flex items-center gap-3 bg-surface-light/80 rounded-xl p-3 border border-border/80"
+              >
                 <span className="text-2xl">{AVATARS[p.avatar]}</span>
                 <span className="font-bold">{p.name}</span>
                 {p.id === game.hostId && (
@@ -446,13 +568,19 @@ export default function GamePage() {
           </div>
 
           {game.hostId === playerId && game.players.length >= 2 && (
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={startMultiplayerGame} className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-lg shadow-lg shadow-accent/20">
-              Start Game ({game.players.length} players)
+            <motion.button
+              id="start-lobby-btn"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={startMultiplayerGame}
+              className="cta-primary w-full py-3.5 text-lg"
+            >
+              Start Match ({game.players.length} players)
             </motion.button>
           )}
 
           {game.hostId !== playerId && (
-            <p className="text-text-muted animate-pulse">Waiting for host to start...</p>
+            <p className="text-text-muted animate-pulse">Waiting for host to launch the game...</p>
           )}
         </motion.div>
       </div>
@@ -465,17 +593,29 @@ export default function GamePage() {
     : undefined;
 
   const selectedCard = selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null;
-  const canPlayPair = selectedCards.length === 2 && selectedCard && isCatCard(selectedCard.type);
-  const canPlayTriple = selectedCards.length === 3 && selectedCard && isCatCard(selectedCard.type);
-  const canPlaySingle = selectedCards.length === 1 && selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
+  const canPlayPair = selectedCards.length === 2 && !!selectedCard && isCatCard(selectedCard.type);
+  const canPlayTriple = selectedCards.length === 3 && !!selectedCard && isCatCard(selectedCard.type);
+  const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
   const canPlay = isMyTurn && !hasPendingAction && (canPlaySingle || canPlayPair || canPlayTriple) && !actionLoading;
   const favorGiveMode = game.pendingAction?.type === 'favor_give' && isPendingOnMe;
+  const actionHint = getActionHint({
+    isMyTurn,
+    hasPendingAction,
+    selectingTarget,
+    selectingThreeTarget,
+    favorGiveMode,
+    canPlay,
+    selectedCards,
+    actionLoading,
+  });
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative">
       {/* Particle canvases */}
-      <canvas ref={confettiRef} className="fixed inset-0 pointer-events-none z-[60]" />
-      <canvas ref={particleRef} className="fixed inset-0 pointer-events-none z-[55]" />
+      <canvas ref={confettiRef} className="fixed inset-0 w-full h-full pointer-events-none z-[60]" />
+      <canvas ref={particleRef} className="fixed inset-0 w-full h-full pointer-events-none z-[55]" />
+      <div className="pointer-events-none absolute -top-28 -left-16 w-64 h-64 rounded-full bg-accent/25 blur-[90px]" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-success/20 blur-[100px]" />
 
       {/* Card play flash overlay */}
       <AnimatePresence>
@@ -633,7 +773,19 @@ export default function GamePage() {
       />
 
       {/* Top bar */}
-      <div className="bg-surface/95 backdrop-blur-md border-b border-border px-2 py-2 flex items-center gap-2">
+      <div className="glass-panel border-x-0 border-t-0 rounded-none px-2 md:px-3 py-2 flex items-center gap-2">
+        <div className="hidden sm:flex flex-col items-start gap-1">
+          <span className="status-pill py-1 text-[10px]">Room {game.code}</span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(game.code);
+              toast.success('Code copied');
+            }}
+            className="text-[11px] text-text-muted hover:text-accent"
+          >
+            Copy code
+          </button>
+        </div>
         <div className="flex-1 overflow-x-auto">
           <OpponentBar
             players={game.players}
@@ -658,7 +810,7 @@ export default function GamePage() {
           </motion.div>
         )}
         {favorGiveMode && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-[#AA44FF]/20 border-b border-[#AA44FF]/30 px-4 py-2 text-center text-[#AA44FF] font-bold text-sm animate-pulse">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-[#20a4f3]/20 border-b border-[#20a4f3]/30 px-4 py-2 text-center text-[#86d7ff] font-bold text-sm animate-pulse">
             Someone asked for a Favor! Tap a card to give it.
           </motion.div>
         )}
@@ -677,7 +829,7 @@ export default function GamePage() {
       )}
 
       {/* Main game area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-3 overflow-hidden relative game-bg">
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-3 md:p-4 overflow-hidden relative game-bg table-aura">
         {/* Floating emote */}
         <AnimatePresence>
           {floatingEmote && (
@@ -701,8 +853,8 @@ export default function GamePage() {
             key={game.currentPlayerIndex}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className={`text-center px-4 py-1.5 rounded-full text-sm font-bold ${
-              isMyTurn ? 'bg-accent/20 text-accent' : 'bg-surface-light text-text-muted'
+            className={`text-center px-4 py-1.5 rounded-full text-sm font-bold border ${
+              isMyTurn ? 'bg-accent/20 text-accent border-accent/40' : 'bg-surface-light/90 text-text-muted border-border'
             }`}
           >
             {isMyTurn ? (
@@ -718,8 +870,17 @@ export default function GamePage() {
           <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} />
         </div>
 
+        <motion.div
+          key={actionHint}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-lg w-full text-center text-xs md:text-sm text-text-muted bg-surface-light/70 border border-border/80 rounded-full px-4 py-2"
+        >
+          {actionHint}
+        </motion.div>
+
         {/* Draw & Discard piles */}
-        <div className="flex items-center gap-6 md:gap-10">
+        <div className="flex items-center gap-6 md:gap-10 rounded-3xl bg-surface/60 border border-border/70 px-6 py-5 shadow-xl">
           <DrawPile count={game.deck.length} onClick={drawCard} disabled={actionLoading || hasPendingAction} isMyTurn={isMyTurn} />
           <DiscardPile cards={game.discardPile} />
         </div>
@@ -738,7 +899,7 @@ export default function GamePage() {
       </div>
 
       {/* Bottom bar: player info + hand */}
-      <div className="bg-surface/95 backdrop-blur-md border-t border-border">
+      <div className="glass-panel border-x-0 border-b-0 rounded-none">
         {/* My info + actions */}
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
@@ -764,6 +925,7 @@ export default function GamePage() {
 
             {canPlay && (
               <motion.button
+                id="play-selected-btn"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ scale: 1.05 }}

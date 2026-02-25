@@ -16,7 +16,7 @@ export default function QuickEmotes({ onEmote }: QuickEmotesProps) {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-8 h-8 rounded-lg bg-surface-light/80 border border-border flex items-center justify-center text-sm hover:border-accent transition-colors"
+        className="w-8 h-8 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-sm hover:border-accent hover:bg-surface-light transition-colors"
         title="Emotes"
       >
         😄

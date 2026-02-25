@@ -25,8 +25,9 @@ export default function SoundToggle() {
   return (
     <button
       onClick={toggle}
-      className="w-8 h-8 rounded-lg bg-surface-light/80 border border-border flex items-center justify-center text-sm hover:border-accent transition-colors"
+      className="w-8 h-8 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-sm hover:border-accent hover:bg-surface-light transition-colors"
       title={muted ? 'Unmute' : 'Mute'}
+      aria-label={muted ? 'Unmute sound effects' : 'Mute sound effects'}
     >
       {muted ? '🔇' : '🔊'}
     </button>

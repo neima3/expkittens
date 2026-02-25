@@ -24,8 +24,9 @@ export default function RulesPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="glass-panel rounded-[1.5rem] p-5 md:p-8"
       >
-        <h1 className="text-4xl font-black mb-2">
+        <h1 className="display-font text-4xl mb-2">
           <span className="bg-gradient-to-r from-accent to-warning bg-clip-text text-transparent">
             How to Play
           </span>

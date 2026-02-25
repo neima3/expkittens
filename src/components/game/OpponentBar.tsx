@@ -35,8 +35,8 @@ export default function OpponentBar({
             whileTap={isSelectable ? { scale: 0.95 } : undefined}
             onClick={() => isSelectable && onPlayerClick?.(player.id)}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all min-w-fit
-              ${!player.isAlive ? 'opacity-40 border-danger/30 bg-danger/5' : ''}
-              ${isCurrent && player.isAlive ? 'border-accent bg-accent/10 animate-pulse-glow' : 'border-border bg-surface-light'}
+              ${!player.isAlive ? 'opacity-45 border-danger/35 bg-danger/10' : ''}
+              ${isCurrent && player.isAlive ? 'border-accent bg-accent/16 animate-pulse-glow' : 'border-border bg-surface-light/80'}
               ${isSelectable ? 'cursor-pointer border-warning hover:border-accent' : 'cursor-default'}
             `}
             disabled={!isSelectable}

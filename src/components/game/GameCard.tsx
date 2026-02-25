@@ -17,7 +17,7 @@ interface GameCardProps {
 
 const sizeMap = {
   sm: { w: 'w-12', h: 'h-[68px]', emoji: 'text-base', name: 'text-[7px]', r: 'rounded-lg', icon: 18 },
-  md: { w: 'w-[72px]', h: 'h-[100px]', emoji: 'text-2xl', name: 'text-[9px]', r: 'rounded-xl', icon: 28 },
+  md: { w: 'w-[74px]', h: 'h-[104px]', emoji: 'text-2xl', name: 'text-[9px]', r: 'rounded-xl', icon: 28 },
   lg: { w: 'w-24', h: 'h-[136px]', emoji: 'text-4xl', name: 'text-xs', r: 'rounded-2xl', icon: 36 },
 };
 
@@ -33,13 +33,13 @@ function getCardPattern(type: CardType): string {
     case 'skip':
       return 'linear-gradient(135deg, #2244bb 0%, #4488ff 50%, #66aaff 100%)';
     case 'favor':
-      return 'linear-gradient(135deg, #7722cc 0%, #aa44ff 50%, #cc77ff 100%)';
+      return 'linear-gradient(135deg, #2f88d8 0%, #4cb8ff 55%, #6ddbcf 100%)';
     case 'shuffle':
       return 'linear-gradient(135deg, #118888 0%, #22cccc 50%, #44eedd 100%)';
     case 'see_the_future':
-      return 'linear-gradient(135deg, #aa1166 0%, #ff44aa 40%, #ff88cc 100%)';
+      return 'linear-gradient(135deg, #8b2cff 0%, #4d7bff 50%, #33d4ff 100%)';
     case 'nope':
-      return 'linear-gradient(135deg, #444466 0%, #666688 50%, #8888aa 100%)';
+      return 'linear-gradient(135deg, #4f536b 0%, #7580a0 50%, #93a0ba 100%)';
     case 'taco_cat':
       return 'linear-gradient(135deg, #cc9900 0%, #ffcc00 50%, #ffdd44 100%)';
     case 'rainbow_cat':
@@ -72,12 +72,14 @@ export default function GameCard({
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: index * 0.05 }}
-        className={`${s.w} ${s.h} ${s.r} border-2 border-[#444466] flex items-center justify-center shadow-lg flex-shrink-0`}
+        className={`${s.w} ${s.h} ${s.r} border-2 border-[#4b3d72] flex items-center justify-center shadow-lg flex-shrink-0`}
         style={{
-          background: 'repeating-linear-gradient(45deg, #1e1e3a, #1e1e3a 4px, #252548 4px, #252548 8px)',
+          background:
+            'linear-gradient(145deg, #161125 0%, #231a3a 100%), repeating-linear-gradient(45deg, #18142b, #18142b 4px, #262042 4px, #262042 8px)',
+          boxShadow: '0 12px 24px rgba(9, 6, 18, 0.45)',
         }}
       >
-        <div className="text-xl opacity-30">🐱</div>
+        <div className="text-xl opacity-35">🐾</div>
       </motion.div>
     );
   }
@@ -94,16 +96,17 @@ export default function GameCard({
       onClick={!disabled ? onClick : undefined}
       disabled={disabled}
       className={`${s.w} ${s.h} ${s.r} relative flex flex-col items-center justify-center border-2 transition-all shadow-lg flex-shrink-0 overflow-hidden
-        ${selected ? 'border-white ring-2 ring-white/40 -translate-y-3 z-10' : 'border-white/10'}
+        ${selected ? 'border-warning ring-2 ring-warning/50 -translate-y-3 z-10' : 'border-white/12'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl'}
         ${glowPlayable && !disabled && !selected ? 'animate-pulse-glow' : ''}
       `}
       style={{
         background: getCardPattern(card.type),
+        boxShadow: '0 10px 20px rgba(8, 6, 15, 0.35)',
       }}
     >
       {/* Inner glow overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/30 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-white/24 via-transparent to-black/35 pointer-events-none" />
 
       {/* Decorative corner dots */}
       <div className="absolute top-1 left-1.5 w-1 h-1 rounded-full bg-white/30" />

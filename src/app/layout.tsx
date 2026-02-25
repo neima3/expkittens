@@ -1,26 +1,32 @@
 import type { Metadata, Viewport } from 'next';
-import { Nunito } from 'next/font/google';
+import { Bungee, Space_Grotesk } from 'next/font/google';
 import { Toaster } from 'sonner';
 import './globals.css';
 
-const nunito = Nunito({
+const bodyFont = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-game',
 });
 
+const displayFont = Bungee({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-display',
+});
+
 export const metadata: Metadata = {
-  title: 'Exploding Kittens - Play Online',
-  description: 'Play Exploding Kittens online with friends or against the computer! Free, no downloads needed.',
+  title: 'Exploding Kittens Party Arena',
+  description: 'A fast, social card showdown. Bluff, explode, emote, and survive with friends.',
   icons: { icon: '/favicon.svg' },
   openGraph: {
-    title: 'Exploding Kittens - Play Online',
-    description: 'Play Exploding Kittens online with friends or against the computer!',
+    title: 'Exploding Kittens Party Arena',
+    description: 'A fast, social card showdown. Bluff, explode, emote, and survive with friends.',
     type: 'website',
   },
   twitter: {
     card: 'summary',
-    title: 'Exploding Kittens - Play Online',
-    description: 'Play Exploding Kittens online with friends or against the computer!',
+    title: 'Exploding Kittens Party Arena',
+    description: 'A fast, social card showdown. Bluff, explode, emote, and survive with friends.',
   },
 };
 
@@ -29,21 +35,21 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#0f0f23',
+  themeColor: '#110f1d',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${nunito.variable} font-[family-name:var(--font-game)] antialiased`}>
+      <body className={`${bodyFont.variable} ${displayFont.variable} font-[family-name:var(--font-game)] antialiased`}>
         {children}
         <Toaster
           position="top-center"
           toastOptions={{
             style: {
-              background: '#1a1a2e',
-              color: '#e8e8f0',
-              border: '1px solid #333355',
+              background: '#151126',
+              color: '#f6f4ff',
+              border: '1px solid #3a2f56',
             },
           }}
         />

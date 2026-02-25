@@ -13,7 +13,7 @@ export default function DiscardPile({ cards }: DiscardPileProps) {
   const info = topCard ? CARD_INFO[topCard.type] : null;
 
   return (
-    <div className="relative w-24 h-[136px] md:w-28 md:h-40 rounded-2xl border-2 border-border border-dashed flex flex-col items-center justify-center">
+    <div className="relative w-24 h-[136px] md:w-28 md:h-40 rounded-2xl border-2 border-border/90 border-dashed bg-surface-light/30 flex flex-col items-center justify-center">
       <AnimatePresence>
         {topCard && info ? (
           <motion.div
@@ -27,7 +27,7 @@ export default function DiscardPile({ cards }: DiscardPileProps) {
             }}
           >
             <span className="text-3xl">{info.emoji}</span>
-            <span className="text-[10px] font-bold mt-1" style={{ color: info.color }}>
+            <span className="text-[10px] font-bold mt-1 px-1 text-center" style={{ color: info.color }}>
               {info.name}
             </span>
           </motion.div>

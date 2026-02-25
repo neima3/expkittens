@@ -11,6 +11,15 @@ import { getStats } from '@/lib/stats';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
+const FLOATING_TOKENS = [
+  { symbol: '💣', top: '10%', left: '8%', delay: 0, duration: 15 },
+  { symbol: '🎉', top: '16%', left: '86%', delay: 1.2, duration: 18 },
+  { symbol: '😼', top: '78%', left: '12%', delay: 0.8, duration: 17 },
+  { symbol: '⚡', top: '72%', left: '84%', delay: 1.6, duration: 19 },
+  { symbol: '🔥', top: '38%', left: '4%', delay: 0.3, duration: 21 },
+  { symbol: '🎴', top: '44%', left: '90%', delay: 2, duration: 16 },
+];
+
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,14 +38,17 @@ function HomeContent() {
     const savedName = localStorage.getItem('ek_playerName');
     const savedAvatar = localStorage.getItem('ek_avatar');
     if (savedName) setPlayerName(savedName);
-    if (savedAvatar) setAvatar(parseInt(savedAvatar));
+    if (savedAvatar) {
+      const avatarNum = Number.parseInt(savedAvatar, 10);
+      if (!Number.isNaN(avatarNum)) setAvatar(avatarNum);
+    }
     const stats = getStats();
     setQuickStats({ gamesPlayed: stats.gamesPlayed, wins: stats.wins, winStreak: stats.winStreak });
   }, []);
 
   async function createGame() {
     if (!playerName.trim()) {
-      toast.error('Enter your name!');
+      toast.error('Enter your name first');
       return;
     }
     setLoading(true);
@@ -67,7 +79,7 @@ function HomeContent() {
 
   async function joinGame() {
     if (!playerName.trim() || !joinCode.trim()) {
-      toast.error('Enter your name and game code!');
+      toast.error('Enter your name and game code');
       return;
     }
     setLoading(true);
@@ -96,22 +108,17 @@ function HomeContent() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {[...Array(6)].map((_, i) => (
+    <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        {FLOATING_TOKENS.map(token => (
           <motion.div
-            key={i}
-            className="absolute text-6xl opacity-10"
-            initial={{ x: `${Math.random() * 100}%`, y: `${Math.random() * 100}%` }}
-            animate={{
-              x: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
-              y: [`${Math.random() * 100}%`, `${Math.random() * 100}%`],
-              rotate: [0, 360],
-            }}
-            transition={{ duration: 20 + i * 5, repeat: Infinity, repeatType: 'reverse' }}
+            key={token.symbol + token.left}
+            className="absolute text-4xl md:text-5xl opacity-15"
+            style={{ top: token.top, left: token.left }}
+            animate={{ y: [0, -12, 0], rotate: [0, 8, -8, 0] }}
+            transition={{ duration: token.duration, repeat: Infinity, delay: token.delay }}
           >
-            {['💣', '😼', '🔧', '⚔️', '🔮', '🌮'][i]}
+            {token.symbol}
           </motion.div>
         ))}
       </div>
@@ -120,87 +127,82 @@ function HomeContent() {
         {screen === 'home' && (
           <motion.div
             key="home"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="text-center max-w-md w-full"
+            className="glass-panel rounded-[2rem] max-w-xl w-full px-5 py-6 md:p-9 text-center"
           >
-            <motion.div
-              className="text-8xl mb-4"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <span className="status-pill">Party Card Game</span>
+              <span className="status-pill">2-5 players</span>
+            </div>
+
+            <motion.div className="text-7xl md:text-8xl mb-2" animate={{ y: [0, -8, 0] }} transition={{ duration: 2.3, repeat: Infinity }}>
               💣
             </motion.div>
-            <h1 className="text-5xl md:text-6xl font-black mb-2 bg-gradient-to-r from-accent to-warning bg-clip-text text-transparent">
-              Exploding
+
+            <h1 className="display-font text-4xl md:text-5xl leading-tight text-transparent bg-clip-text bg-gradient-to-r from-[#ff8d44] via-[#ffd27a] to-[#ff5f2e] mb-2">
+              Exploding Kittens
             </h1>
-            <h1 className="text-5xl md:text-6xl font-black mb-8 bg-gradient-to-r from-warning to-danger bg-clip-text text-transparent">
-              Kittens
-            </h1>
-            <p className="text-text-muted mb-10 text-lg">
-              Don&apos;t draw the exploding kitten. Or else... 💥
+            <p className="subtle-text text-base md:text-lg mb-8">
+              Bluff hard. Play dirty. Don&apos;t pull the bomb.
             </p>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <motion.button
-                whileHover={{ scale: 1.03 }}
+                id="start-friends-btn"
+                whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => { setMode('ai'); setScreen('setup'); }}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-lg shadow-lg shadow-accent/20 transition-shadow hover:shadow-xl hover:shadow-accent/30"
+                onClick={() => {
+                  setMode('multiplayer');
+                  setScreen('setup');
+                }}
+                className="cta-primary w-full py-4 px-6 text-base md:text-lg"
               >
-                🤖 Play vs Computer
+                🎉 Start Friend Lobby
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.03 }}
+                id="start-ai-btn"
+                whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => { setMode('multiplayer'); setScreen('setup'); }}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-bold text-lg shadow-lg shadow-[#6366f1]/20 transition-shadow hover:shadow-xl hover:shadow-[#6366f1]/30"
+                onClick={() => {
+                  setMode('ai');
+                  setScreen('setup');
+                }}
+                className="cta-secondary w-full py-4 px-6 text-base md:text-lg"
               >
-                🌐 Create Online Game
+                🤖 Quick Match vs AI
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.03 }}
+                id="join-code-btn"
+                whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setScreen('join')}
-                className="w-full py-4 px-6 rounded-2xl bg-surface-light border border-border text-text font-bold text-lg hover:border-accent/50 transition-colors"
+                className="cta-ghost w-full py-4 px-6 text-base md:text-lg"
               >
-                🔗 Join with Code
+                🔗 Join with Room Code
               </motion.button>
             </div>
 
-            {/* Stats bar */}
             {quickStats.gamesPlayed > 0 && (
-              <div className="mt-6 flex items-center justify-center gap-4 text-sm text-text-muted">
-                <span>{quickStats.gamesPlayed} games</span>
-                <span className="text-border">|</span>
-                <span className="text-success">{quickStats.wins} wins</span>
-                {quickStats.winStreak > 0 && (
-                  <>
-                    <span className="text-border">|</span>
-                    <span className="text-warning">{quickStats.winStreak} streak 🔥</span>
-                  </>
-                )}
+              <div className="mt-7 grid grid-cols-3 gap-2 text-left">
+                <StatChip label="Games" value={quickStats.gamesPlayed} tone="muted" />
+                <StatChip label="Wins" value={quickStats.wins} tone="success" />
+                <StatChip label="Streak" value={quickStats.winStreak} tone="warning" />
               </div>
             )}
 
-            <button
-              onClick={() => setShowStats(true)}
-              className="text-text-muted hover:text-accent transition-colors text-sm mt-3 inline-block"
-            >
-              📊 View Stats
-            </button>
-
-            <br />
-
-            <Link
-              href="/rules"
-              className="text-text-muted hover:text-accent transition-colors text-sm mt-2 inline-block"
-            >
-              How to Play →
-            </Link>
+            <div className="mt-6 flex items-center justify-center gap-4 text-sm">
+              <button onClick={() => setShowStats(true)} className="text-text-muted hover:text-accent">
+                View Stats
+              </button>
+              <span className="text-border">•</span>
+              <Link href="/rules" className="text-text-muted hover:text-accent">
+                Rules
+              </Link>
+            </div>
           </motion.div>
         )}
 
@@ -210,47 +212,48 @@ function HomeContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-md w-full"
+            className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8"
           >
-            <button
-              onClick={() => setScreen('home')}
-              className="text-text-muted hover:text-text mb-6 flex items-center gap-2"
-            >
+            <button onClick={() => setScreen('home')} className="text-text-muted hover:text-text mb-5">
               ← Back
             </button>
 
-            <h2 className="text-3xl font-bold mb-6">
-              {mode === 'ai' ? '🤖 vs Computer' : '🌐 Create Game'}
+            <h2 className="display-font text-2xl md:text-3xl mb-1 text-warning">
+              {mode === 'ai' ? 'Quick Match Setup' : 'Friend Lobby Setup'}
             </h2>
+            <p className="subtle-text mb-6 text-sm">
+              {mode === 'ai'
+                ? 'Set your vibe and jump in.'
+                : 'Create a room, share the code, and start chaos.'}
+            </p>
 
-            {/* Name input */}
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="text-sm text-text-muted mb-2 block">Your Name</label>
               <input
+                id="player-name-input"
                 type="text"
                 value={playerName}
                 onChange={e => setPlayerName(e.target.value)}
                 placeholder="Enter your name..."
                 maxLength={20}
                 autoFocus
-                className="w-full py-3 px-4 rounded-xl bg-surface-light border border-border focus:border-accent focus:outline-none text-text text-lg"
+                className="w-full py-3.5 px-4 rounded-xl bg-surface-light/85 border border-border focus:border-accent focus:outline-none text-text text-lg"
               />
             </div>
 
-            {/* Avatar selection */}
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="text-sm text-text-muted mb-2 block">Choose Avatar</label>
               <div className="grid grid-cols-8 gap-2">
                 {AVATARS.map((emoji, i) => (
                   <motion.button
                     key={i}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={() => setAvatar(i)}
-                    className={`text-3xl p-2 rounded-xl transition-all ${
+                    className={`text-2xl md:text-3xl p-2 rounded-xl transition-all ${
                       avatar === i
-                        ? 'bg-accent/20 border-2 border-accent'
-                        : 'bg-surface-light border-2 border-transparent hover:border-border'
+                        ? 'bg-accent/20 border-2 border-accent shadow-lg shadow-accent/25'
+                        : 'bg-surface-light/65 border-2 border-transparent hover:border-border'
                     }`}
                   >
                     {emoji}
@@ -259,21 +262,20 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* AI count for single player */}
             {mode === 'ai' && (
-              <div className="mb-8">
-                <label className="text-sm text-text-muted mb-2 block">Number of Opponents</label>
-                <div className="flex gap-2">
+              <div className="mb-7">
+                <label className="text-sm text-text-muted mb-2 block">Number of AI Opponents</label>
+                <div className="grid grid-cols-4 gap-2">
                   {[1, 2, 3, 4].map(n => (
                     <motion.button
                       key={n}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => setAiCount(n)}
-                      className={`flex-1 py-3 rounded-xl font-bold transition-all ${
+                      className={`py-3 rounded-xl font-bold transition-all ${
                         aiCount === n
-                          ? 'bg-accent text-white'
-                          : 'bg-surface-light text-text-muted hover:text-text'
+                          ? 'cta-primary'
+                          : 'bg-surface-light/70 text-text-muted hover:text-text border border-border'
                       }`}
                     >
                       {n}
@@ -284,19 +286,22 @@ function HomeContent() {
             )}
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
+              id="create-game-btn"
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={createGame}
               disabled={loading}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-lg shadow-lg shadow-accent/20 disabled:opacity-50"
+              className="cta-primary w-full py-4 px-6 text-lg disabled:opacity-60"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Creating...
                 </span>
+              ) : mode === 'ai' ? (
+                'Start Match'
               ) : (
-                mode === 'ai' ? 'Start Game' : 'Create Room'
+                'Create Lobby'
               )}
             </motion.button>
           </motion.div>
@@ -308,44 +313,42 @@ function HomeContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-md w-full"
+            className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8"
           >
-            <button
-              onClick={() => setScreen('home')}
-              className="text-text-muted hover:text-text mb-6 flex items-center gap-2"
-            >
+            <button onClick={() => setScreen('home')} className="text-text-muted hover:text-text mb-5">
               ← Back
             </button>
 
-            <h2 className="text-3xl font-bold mb-6">🔗 Join Game</h2>
+            <h2 className="display-font text-2xl md:text-3xl text-[#2fd19f] mb-1">Join Friend Lobby</h2>
+            <p className="subtle-text mb-6 text-sm">Drop your name, pick a cat, and jump into the room.</p>
 
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="text-sm text-text-muted mb-2 block">Your Name</label>
               <input
+                id="join-player-name-input"
                 type="text"
                 value={playerName}
                 onChange={e => setPlayerName(e.target.value)}
                 placeholder="Enter your name..."
                 maxLength={20}
                 autoFocus
-                className="w-full py-3 px-4 rounded-xl bg-surface-light border border-border focus:border-accent focus:outline-none text-text text-lg"
+                className="w-full py-3.5 px-4 rounded-xl bg-surface-light/85 border border-border focus:border-accent focus:outline-none text-text text-lg"
               />
             </div>
 
-            {/* Avatar selection */}
-            <div className="mb-6">
+            <div className="mb-5">
               <label className="text-sm text-text-muted mb-2 block">Choose Avatar</label>
               <div className="grid grid-cols-8 gap-2">
                 {AVATARS.map((emoji, i) => (
                   <motion.button
                     key={i}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={() => setAvatar(i)}
-                    className={`text-3xl p-2 rounded-xl transition-all ${
+                    className={`text-2xl md:text-3xl p-2 rounded-xl transition-all ${
                       avatar === i
-                        ? 'bg-accent/20 border-2 border-accent'
-                        : 'bg-surface-light border-2 border-transparent hover:border-border'
+                        ? 'bg-[#2fd19f]/20 border-2 border-[#2fd19f] shadow-lg shadow-[#2fd19f]/20'
+                        : 'bg-surface-light/65 border-2 border-transparent hover:border-border'
                     }`}
                   >
                     {emoji}
@@ -354,24 +357,26 @@ function HomeContent() {
               </div>
             </div>
 
-            <div className="mb-8">
-              <label className="text-sm text-text-muted mb-2 block">Game Code</label>
+            <div className="mb-7">
+              <label className="text-sm text-text-muted mb-2 block">6-Letter Room Code</label>
               <input
+                id="join-code-input"
                 type="text"
                 value={joinCode}
                 onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Enter 6-letter code..."
+                placeholder="ABC123"
                 maxLength={6}
-                className="w-full py-3 px-4 rounded-xl bg-surface-light border border-border focus:border-accent focus:outline-none text-text text-2xl text-center tracking-[0.3em] font-mono uppercase"
+                className="w-full py-3.5 px-4 rounded-xl bg-surface-light/85 border border-border focus:border-[#2fd19f] focus:outline-none text-text text-2xl text-center tracking-[0.3em] font-mono uppercase"
               />
             </div>
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
+              id="join-room-btn"
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={joinGame}
               disabled={loading}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white font-bold text-lg shadow-lg shadow-[#6366f1]/20 disabled:opacity-50"
+              className="cta-secondary w-full py-4 px-6 text-lg disabled:opacity-60"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -379,7 +384,7 @@ function HomeContent() {
                   Joining...
                 </span>
               ) : (
-                'Join Game'
+                'Join Room'
               )}
             </motion.button>
           </motion.div>
@@ -391,13 +396,39 @@ function HomeContent() {
   );
 }
 
+function StatChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'muted' | 'success' | 'warning';
+}) {
+  const toneClass =
+    tone === 'success'
+      ? 'text-success border-success/40'
+      : tone === 'warning'
+        ? 'text-warning border-warning/40'
+        : 'text-text border-border';
+
+  return (
+    <div className={`rounded-xl border px-3 py-2 bg-surface-light/55 ${toneClass}`}>
+      <p className="text-lg leading-none font-extrabold">{value}</p>
+      <p className="text-[10px] uppercase tracking-[0.08em] opacity-80 mt-1">{label}</p>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
-    <Suspense fallback={
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-dvh flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <HomeContent />
     </Suspense>
   );

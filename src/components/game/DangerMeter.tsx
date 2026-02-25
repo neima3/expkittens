@@ -20,7 +20,7 @@ export default function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps
   else if (danger > 0.05) { color = '#88cc44'; label = 'Low'; }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-light/80 border border-border text-xs">
+    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-light/85 border border-border text-xs shadow-lg">
       <motion.div
         animate={danger > 0.3 ? { scale: [1, 1.2, 1] } : {}}
         transition={{ duration: 0.8, repeat: Infinity }}
@@ -28,7 +28,7 @@ export default function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps
       >
         💣
       </motion.div>
-      <div className="w-16 h-1.5 rounded-full bg-[#1a1a2e] overflow-hidden">
+      <div className="w-16 h-1.5 rounded-full bg-[#1b1530] overflow-hidden">
         <motion.div
           className="h-full rounded-full"
           style={{ background: color }}
@@ -37,8 +37,8 @@ export default function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps
           transition={{ type: 'spring', stiffness: 100 }}
         />
       </div>
-      <span style={{ color }} className="font-bold">
-        {label}
+      <span style={{ color }} className="font-bold min-w-[48px]">
+        {label} {percent > 0 ? `${percent}%` : ''}
       </span>
     </div>
   );
