@@ -54,11 +54,17 @@ export default function GamePage() {
   const confettiRef = useRef<HTMLCanvasElement>(null);
   const particleRef = useRef<HTMLCanvasElement>(null);
   const hasRecordedResult = useRef(false);
+  const gameRef = useRef<GameState | null>(null);
+  const actionLoadingRef = useRef(false);
+
+  // Keep refs in sync with state for use in poll callback
+  gameRef.current = game;
+  actionLoadingRef.current = actionLoading;
 
   const myPlayer = game?.players.find(p => p.id === playerId);
   const currentPlayer = game ? game.players[game.currentPlayerIndex] : null;
   const isMyTurn = currentPlayer?.id === playerId;
-  const hasPendingAction = game?.pendingAction !== null;
+  const hasPendingAction = !!game?.pendingAction;
   const isPendingOnMe = game?.pendingAction?.playerId === playerId;
   const alivePlayers = game?.players.filter(p => p.isAlive).length ?? 0;
 
@@ -106,9 +112,9 @@ export default function GamePage() {
     }
   }
 
-  // Poll for updates
+  // Poll for updates — uses refs to avoid stale closures and constant interval recreation
   const poll = useCallback(async () => {
-    if (!playerId) return;
+    if (!playerId || actionLoadingRef.current) return;
     try {
       const res = await fetch(
         `/api/games/${gameId}/poll?playerId=${playerId}&lastActionId=${lastActionIdRef.current}`
@@ -116,7 +122,7 @@ export default function GamePage() {
       const data = await res.json();
       if (!data.changed || !data.game) return;
 
-      const oldGame = game;
+      const oldGame = gameRef.current;
       setGame(data.game);
       lastActionIdRef.current = data.lastActionId;
 
@@ -149,7 +155,7 @@ export default function GamePage() {
     } catch {
       // Silent
     }
-  }, [gameId, playerId, game]);
+  }, [gameId, playerId]);
 
   function triggerExplosion() {
     setShowExplosion(true);
@@ -187,14 +193,14 @@ export default function GamePage() {
     fetchGame(pid);
   }, [gameId, fetchGame, router]);
 
-  // Polling
+  // Polling — stable interval, poll callback uses refs to read latest state
   useEffect(() => {
-    if (!playerId || !game) return;
+    if (!playerId) return;
     pollIntervalRef.current = setInterval(poll, 1500);
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [playerId, poll, game]);
+  }, [playerId, poll]);
 
   // Play turn-start sound + vibrate on mobile
   useEffect(() => {
@@ -204,8 +210,19 @@ export default function GamePage() {
     }
   }, [isMyTurn, game?.currentPlayerIndex]);
 
+  // Safety: reset actionLoading if stuck for over 15 seconds
+  useEffect(() => {
+    if (!actionLoading) return;
+    const timeout = setTimeout(() => {
+      setActionLoading(false);
+      fetchGame();
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [actionLoading, fetchGame]);
+
   // Send action
   async function sendAction(actionData: Record<string, unknown>) {
+    if (actionLoading) return;
     setActionLoading(true);
     try {
       const res = await fetch(`/api/games/${gameId}/action`, {
