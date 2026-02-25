@@ -122,6 +122,14 @@ export default function GamePage() {
 
       // Detect events from state changes
       if (oldGame) {
+        // Show toast for new log entries from opponents
+        const newLogs = data.game.logs.slice(oldGame.logs.length);
+        for (const log of newLogs) {
+          if (log.playerId && log.playerId !== playerId) {
+            toast(log.message, { duration: 2500 });
+          }
+        }
+
         for (const p of data.game.players) {
           const oldP = oldGame.players.find(op => op.id === p.id);
           if (oldP?.isAlive && !p.isAlive) {
@@ -188,10 +196,11 @@ export default function GamePage() {
     };
   }, [playerId, poll, game]);
 
-  // Play turn-start sound
+  // Play turn-start sound + vibrate on mobile
   useEffect(() => {
     if (isMyTurn && game?.status === 'playing') {
       sounds?.turnStart();
+      if (navigator.vibrate) navigator.vibrate(50);
     }
   }, [isMyTurn, game?.currentPlayerIndex]);
 
@@ -730,9 +739,9 @@ export default function GamePage() {
           <div className="flex items-center gap-2">
             {/* Selected card info */}
             {selectedCard && (
-              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-light/80 border border-border">
+              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-light/80 border border-border">
                 <span className="text-sm">{CARD_INFO[selectedCard.type].emoji}</span>
-                <span className="text-[10px] text-text-muted max-w-[100px] truncate">{CARD_INFO[selectedCard.type].description}</span>
+                <span className="text-[10px] text-text-muted max-w-[80px] sm:max-w-[100px] truncate">{CARD_INFO[selectedCard.type].name}</span>
               </motion.div>
             )}
 
