@@ -16,7 +16,7 @@ export default function DrawPile({ count, onClick, disabled, isMyTurn }: DrawPil
       whileTap={!disabled && isMyTurn ? { scale: 0.95 } : undefined}
       onClick={onClick}
       disabled={disabled || !isMyTurn}
-      className={`relative w-24 h-34 md:w-28 md:h-40 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all
+      className={`relative w-24 h-[136px] md:w-28 md:h-40 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all
         ${isMyTurn && !disabled
           ? 'border-accent bg-accent/10 animate-pulse-glow cursor-pointer hover:bg-accent/20'
           : 'border-border bg-surface-light cursor-default opacity-70'}

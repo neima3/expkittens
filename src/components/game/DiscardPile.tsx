@@ -13,7 +13,7 @@ export default function DiscardPile({ cards }: DiscardPileProps) {
   const info = topCard ? CARD_INFO[topCard.type] : null;
 
   return (
-    <div className="relative w-24 h-34 md:w-28 md:h-40 rounded-2xl border-2 border-border border-dashed flex flex-col items-center justify-center">
+    <div className="relative w-24 h-[136px] md:w-28 md:h-40 rounded-2xl border-2 border-border border-dashed flex flex-col items-center justify-center">
       <AnimatePresence>
         {topCard && info ? (
           <motion.div

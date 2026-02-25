@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { toast } from 'sonner';
+import StatsDisplay from '@/components/game/StatsDisplay';
+import { getStats } from '@/lib/stats';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
@@ -20,12 +22,16 @@ function HomeContent() {
   const [aiCount, setAiCount] = useState(1);
   const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [quickStats, setQuickStats] = useState({ gamesPlayed: 0, wins: 0, winStreak: 0 });
 
   useEffect(() => {
     const savedName = localStorage.getItem('ek_playerName');
     const savedAvatar = localStorage.getItem('ek_avatar');
     if (savedName) setPlayerName(savedName);
     if (savedAvatar) setAvatar(parseInt(savedAvatar));
+    const stats = getStats();
+    setQuickStats({ gamesPlayed: stats.gamesPlayed, wins: stats.wins, winStreak: stats.winStreak });
   }, []);
 
   async function createGame() {
@@ -165,9 +171,33 @@ function HomeContent() {
               </motion.button>
             </div>
 
+            {/* Stats bar */}
+            {quickStats.gamesPlayed > 0 && (
+              <div className="mt-6 flex items-center justify-center gap-4 text-sm text-text-muted">
+                <span>{quickStats.gamesPlayed} games</span>
+                <span className="text-border">|</span>
+                <span className="text-success">{quickStats.wins} wins</span>
+                {quickStats.winStreak > 0 && (
+                  <>
+                    <span className="text-border">|</span>
+                    <span className="text-warning">{quickStats.winStreak} streak 🔥</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowStats(true)}
+              className="text-text-muted hover:text-accent transition-colors text-sm mt-3 inline-block"
+            >
+              📊 View Stats
+            </button>
+
+            <br />
+
             <Link
               href="/rules"
-              className="text-text-muted hover:text-accent transition-colors text-sm mt-6 inline-block"
+              className="text-text-muted hover:text-accent transition-colors text-sm mt-2 inline-block"
             >
               How to Play →
             </Link>
@@ -355,6 +385,8 @@ function HomeContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
     </div>
   );
 }

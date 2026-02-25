@@ -69,5 +69,11 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 
+/* Subtle dot grid background for game area */
+.game-bg {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 /* Mobile safe area */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }

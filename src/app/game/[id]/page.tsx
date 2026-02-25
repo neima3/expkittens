@@ -16,6 +16,7 @@ import ThreeOfKindModal from '@/components/game/ThreeOfKindModal';
 import DangerMeter from '@/components/game/DangerMeter';
 import SoundToggle from '@/components/game/SoundToggle';
 import QuickEmotes from '@/components/game/QuickEmotes';
+import StatsDisplay from '@/components/game/StatsDisplay';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed } from '@/lib/stats';
@@ -45,6 +46,9 @@ export default function GamePage() {
   const [showWinner, setShowWinner] = useState(false);
   const [floatingEmote, setFloatingEmote] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [flashColor, setFlashColor] = useState<string | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [rematchLoading, setRematchLoading] = useState(false);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const confettiRef = useRef<HTMLCanvasElement>(null);
@@ -210,6 +214,13 @@ export default function GamePage() {
       if (actionData.type === 'play_card') {
         sounds?.cardPlay();
         recordCardPlayed();
+        // Flash screen border with card color
+        const playedCard = myPlayer?.hand.find((c: Card) => c.id === actionData.cardId);
+        if (playedCard) {
+          const cardColor = CARD_INFO[playedCard.type].color;
+          setFlashColor(cardColor);
+          setTimeout(() => setFlashColor(null), 300);
+        }
       } else if (actionData.type === 'draw') {
         sounds?.cardDraw();
       }
@@ -319,6 +330,45 @@ export default function GamePage() {
     setFloatingEmote(emote);
   }
 
+  async function handleRematch() {
+    if (!game) return;
+
+    // For multiplayer games, just go home
+    if (game.isMultiplayer) {
+      router.push('/');
+      return;
+    }
+
+    // For AI games, create a new game with same settings
+    setRematchLoading(true);
+    try {
+      const savedName = localStorage.getItem('ek_playerName') || myPlayer?.name || 'Player';
+      const savedAvatar = localStorage.getItem('ek_avatar');
+      const avatarIdx = savedAvatar ? parseInt(savedAvatar) : (myPlayer?.avatar || 0);
+      const aiPlayerCount = game.players.filter(p => p.isAI).length;
+
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerName: savedName,
+          avatar: avatarIdx,
+          mode: 'single',
+          aiCount: aiPlayerCount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      localStorage.setItem(`ek_player_${data.gameId}`, data.playerId);
+      router.push(`/game/${data.gameId}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create rematch');
+    } finally {
+      setRematchLoading(false);
+    }
+  }
+
   // --- RENDER ---
 
   if (loading) {
@@ -401,6 +451,20 @@ export default function GamePage() {
       <canvas ref={confettiRef} className="fixed inset-0 pointer-events-none z-[60]" />
       <canvas ref={particleRef} className="fixed inset-0 pointer-events-none z-[55]" />
 
+      {/* Card play flash overlay */}
+      <AnimatePresence>
+        {flashColor && (
+          <motion.div
+            initial={{ opacity: 0.6 }}
+            animate={{ opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 pointer-events-none z-[45] rounded-lg"
+            style={{ boxShadow: `inset 0 0 60px 10px ${flashColor}` }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Explosion overlay */}
       <AnimatePresence>
         {showExplosion && (
@@ -424,21 +488,55 @@ export default function GamePage() {
               <h2 className="text-3xl font-black mb-2">
                 {game.winnerId === playerId ? 'You Win!' : `${game.players.find(p => p.id === game.winnerId)?.name} Wins!`}
               </h2>
-              <p className="text-text-muted mb-8">
+              <p className="text-text-muted mb-6">
                 {game.winnerId === playerId ? 'You survived all the Exploding Kittens!' : 'Better luck next time!'}
               </p>
-              <div className="flex gap-3">
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => router.push('/')} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold">
-                  Play Again
+              <div className="flex flex-col gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleRematch}
+                  disabled={rematchLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold shadow-lg shadow-accent/20 disabled:opacity-50"
+                >
+                  {rematchLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Creating...
+                    </span>
+                  ) : (
+                    game.isMultiplayer ? '🏠 Play Again' : '🔄 Rematch'
+                  )}
                 </motion.button>
-                <button onClick={() => setShowWinner(false)} className="px-4 py-3 rounded-xl bg-surface-light border border-border text-text-muted font-bold">
-                  View Board
-                </button>
+                <div className="flex gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push('/')}
+                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold hover:border-accent/50 transition-colors"
+                  >
+                    🏠 Home
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowStats(true)}
+                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold hover:border-accent/50 transition-colors"
+                  >
+                    📊 Stats
+                  </motion.button>
+                  <button onClick={() => setShowWinner(false)} className="px-4 py-3 rounded-xl bg-surface-light border border-border text-text-muted font-bold hover:border-accent/50 transition-colors">
+                    👁 Board
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Stats modal */}
+      <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
 
       {/* See the Future modal */}
       <AnimatePresence>
@@ -553,7 +651,7 @@ export default function GamePage() {
       )}
 
       {/* Main game area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-3 overflow-hidden relative">
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-3 overflow-hidden relative game-bg">
         {/* Floating emote */}
         <AnimatePresence>
           {floatingEmote && (
