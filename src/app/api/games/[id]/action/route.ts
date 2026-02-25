@@ -22,14 +22,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let updatedGame = processAction(game, action);
 
-    // Process AI turns if it's an AI's turn
+    // Process AI turns and pending actions
+    let maxIterations = 20; // Safety guard against infinite loops
     let aiProcessed = true;
-    while (aiProcessed && updatedGame.status === 'playing') {
+    while (aiProcessed && updatedGame.status === 'playing' && maxIterations-- > 0) {
+      const prevActionId = updatedGame.lastActionId;
       const currentPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
-      if (currentPlayer.isAI && currentPlayer.isAlive && !updatedGame.pendingAction) {
-        const result = await processAITurn(updatedGame);
-        updatedGame = result.game;
-      } else if (updatedGame.pendingAction && updatedGame.pendingAction.playerId) {
+
+      if (updatedGame.pendingAction) {
+        // Handle pending actions (favor_give, defuse_place, etc.) for AI players
         const pendingPlayer = updatedGame.players.find(p => p.id === updatedGame.pendingAction!.playerId);
         if (pendingPlayer?.isAI) {
           const result = await processAITurn(updatedGame);
@@ -37,8 +38,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         } else {
           aiProcessed = false;
         }
+      } else if (currentPlayer.isAI && currentPlayer.isAlive) {
+        const result = await processAITurn(updatedGame);
+        updatedGame = result.game;
       } else {
         aiProcessed = false;
+      }
+
+      // If no progress was made, break to prevent infinite loop
+      if (updatedGame.lastActionId === prevActionId && aiProcessed) {
+        break;
       }
     }
 

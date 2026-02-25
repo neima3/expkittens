@@ -185,16 +185,12 @@ export async function processAITurn(game: GameState): Promise<{ game: GameState;
   let state = game;
   const actions: GameAction[] = [];
 
-  const currentPlayer = state.players[state.currentPlayerIndex];
-  if (!currentPlayer.isAI || !currentPlayer.isAlive) return { game: state, actions };
-
-  // Small delay for UX
-  await delay(600 + Math.random() * 500);
-
-  // Process pending actions first
+  // Process pending actions FIRST — an AI might need to respond even if it's not their turn
+  // (e.g. favor_give when a human played Favor targeting the AI)
   if (state.pendingAction) {
     const pendingPlayer = state.players.find(p => p.id === state.pendingAction!.playerId);
     if (pendingPlayer?.isAI) {
+      await delay(400 + Math.random() * 300);
       const action = getAIAction(state, pendingPlayer);
       if (action) {
         state = processAction(state, action);
@@ -203,6 +199,12 @@ export async function processAITurn(game: GameState): Promise<{ game: GameState;
     }
     return { game: state, actions };
   }
+
+  const currentPlayer = state.players[state.currentPlayerIndex];
+  if (!currentPlayer.isAI || !currentPlayer.isAlive) return { game: state, actions };
+
+  // Small delay for UX
+  await delay(600 + Math.random() * 500);
 
   // AI plays cards then draws
   let maxPlays = 3;
