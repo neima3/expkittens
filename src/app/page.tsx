@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { toast } from 'sonner';
 import StatsDisplay from '@/components/game/StatsDisplay';
-import { getStats } from '@/lib/stats';
+import { getStats, getRankInfo, getAchievements, getLevelInfo } from '@/lib/stats';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
@@ -33,6 +33,11 @@ function HomeContent() {
   const [loading, setLoading] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [quickStats, setQuickStats] = useState({ gamesPlayed: 0, wins: 0, winStreak: 0 });
+  const [rankTitle, setRankTitle] = useState('Rookie Spark');
+  const [levelNumber, setLevelNumber] = useState(1);
+  const [levelProgress, setLevelProgress] = useState(0);
+  const [levelRemainingXp, setLevelRemainingXp] = useState(120);
+  const [nextUnlock, setNextUnlock] = useState<string | null>(null);
 
   useEffect(() => {
     const savedName = localStorage.getItem('ek_playerName');
@@ -44,6 +49,14 @@ function HomeContent() {
     }
     const stats = getStats();
     setQuickStats({ gamesPlayed: stats.gamesPlayed, wins: stats.wins, winStreak: stats.winStreak });
+    const rank = getRankInfo(stats);
+    const level = getLevelInfo(stats);
+    setRankTitle(rank.title);
+    setLevelNumber(level.level);
+    setLevelProgress(Math.round(level.progress * 100));
+    setLevelRemainingXp(Math.max(0, level.nextLevelXp - level.xp));
+    const next = getAchievements(stats).find(a => !a.unlocked);
+    setNextUnlock(next ? `${next.emoji} ${next.title} (${next.progress}/${next.goal})` : 'All achievements unlocked');
   }, []);
 
   async function createGame() {
@@ -137,6 +150,15 @@ function HomeContent() {
               <span className="status-pill">2-5 players</span>
             </div>
 
+            <div className="mb-4 flex items-center justify-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-warning/40 bg-warning/10 text-warning text-xs font-extrabold uppercase tracking-[0.08em]">
+                👑 {rankTitle}
+              </span>
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-success/40 bg-success/10 text-success text-xs font-extrabold uppercase tracking-[0.08em]">
+                ⭐ Level {levelNumber}
+              </span>
+            </div>
+
             <motion.div className="text-7xl md:text-8xl mb-2" animate={{ y: [0, -8, 0] }} transition={{ duration: 2.3, repeat: Infinity }}>
               💣
             </motion.div>
@@ -191,6 +213,26 @@ function HomeContent() {
                 <StatChip label="Games" value={quickStats.gamesPlayed} tone="muted" />
                 <StatChip label="Wins" value={quickStats.wins} tone="success" />
                 <StatChip label="Streak" value={quickStats.winStreak} tone="warning" />
+              </div>
+            )}
+
+            <div className="mt-3 rounded-xl border border-border bg-surface-light/55 px-3 py-2 text-xs">
+              <div className="flex items-center justify-between text-text-muted mb-1.5">
+                <span>Level {levelNumber}</span>
+                <span>{levelRemainingXp} XP to next level</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-surface overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${levelProgress}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-success to-accent"
+                />
+              </div>
+            </div>
+
+            {nextUnlock && (
+              <div className="mt-3 rounded-xl border border-border bg-surface-light/55 px-3 py-2 text-xs text-text-muted">
+                Next unlock: <span className="text-text">{nextUnlock}</span>
               </div>
             )}
 

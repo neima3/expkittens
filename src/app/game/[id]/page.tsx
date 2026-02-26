@@ -17,9 +17,11 @@ import DangerMeter from '@/components/game/DangerMeter';
 import SoundToggle from '@/components/game/SoundToggle';
 import QuickEmotes from '@/components/game/QuickEmotes';
 import StatsDisplay from '@/components/game/StatsDisplay';
+import ComboCoach from '@/components/game/ComboCoach';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
-import { recordWin, recordLoss, recordExplosion, recordCardPlayed } from '@/lib/stats';
+import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
+import type { ProgressUpdate } from '@/lib/stats';
 
 const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
@@ -80,9 +82,15 @@ export default function GamePage() {
   const [showLog, setShowLog] = useState(false);
   const [flashColor, setFlashColor] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const [showHotkeys, setShowHotkeys] = useState(false);
   const [rematchLoading, setRematchLoading] = useState(false);
+  const [pollIntervalMs, setPollIntervalMs] = useState(1300);
+  const [rankTitle, setRankTitle] = useState('Rookie Spark');
+  const [levelInfo, setLevelInfo] = useState(() => getLevelInfo(getStats()));
+  const [xpGain, setXpGain] = useState<number | null>(null);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confettiRef = useRef<HTMLCanvasElement>(null);
   const particleRef = useRef<HTMLCanvasElement>(null);
   const hasRecordedResult = useRef(false);
@@ -99,6 +107,36 @@ export default function GamePage() {
   const hasPendingAction = !!game?.pendingAction;
   const isPendingOnMe = game?.pendingAction?.playerId === playerId;
   const alivePlayers = game?.players.filter(p => p.isAlive).length ?? 0;
+  const selectedCard = selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null;
+  const canPlayPair = selectedCards.length === 2 && !!selectedCard && isCatCard(selectedCard.type);
+  const canPlayTriple = selectedCards.length === 3 && !!selectedCard && isCatCard(selectedCard.type);
+  const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
+  const canPlay = isMyTurn && !hasPendingAction && (canPlaySingle || canPlayPair || canPlayTriple) && !actionLoading;
+  const favorGiveMode = game?.pendingAction?.type === 'favor_give' && isPendingOnMe;
+  const actionHint = getActionHint({
+    isMyTurn,
+    hasPendingAction,
+    selectingTarget,
+    selectingThreeTarget,
+    favorGiveMode,
+    canPlay,
+    selectedCards,
+    actionLoading,
+  });
+
+  const applyProgressUpdate = useCallback((update: ProgressUpdate) => {
+    if (update.gainedXp > 0) {
+      setXpGain(update.gainedXp);
+      if (xpGainTimerRef.current) clearTimeout(xpGainTimerRef.current);
+      xpGainTimerRef.current = setTimeout(() => setXpGain(null), 1400);
+    }
+    setLevelInfo(prev => {
+      if (update.leveledUp && update.level.level > prev.level) {
+        toast.success(`Level up! Lv.${update.level.level}`);
+      }
+      return update.level;
+    });
+  }, []);
 
   // Load game state
   const fetchGame = useCallback(async (pid?: string) => {
@@ -117,7 +155,7 @@ export default function GamePage() {
     } finally {
       setLoading(false);
     }
-  }, [gameId, playerId]);
+  }, [applyProgressUpdate, gameId, playerId]);
 
   function handlePendingAction(g: GameState, pid: string) {
     if (!g.pendingAction || g.pendingAction.playerId !== pid) return;
@@ -173,7 +211,7 @@ export default function GamePage() {
           if (oldP?.isAlive && !p.isAlive) {
             triggerExplosion();
             if (p.id === playerId) {
-              recordExplosion();
+              applyProgressUpdate(recordExplosion());
             }
           }
         }
@@ -204,15 +242,28 @@ export default function GamePage() {
     hasRecordedResult.current = true;
     if (g.winnerId === playerId) {
       sounds?.win();
-      recordWin();
+      applyProgressUpdate(recordWin());
       setTimeout(() => {
         if (confettiRef.current) launchConfetti(confettiRef.current);
       }, 300);
     } else {
       sounds?.lose();
-      recordLoss();
+      applyProgressUpdate(recordLoss());
     }
   }
+
+  useEffect(() => {
+    if (!showWinner) return;
+    const stats = getStats();
+    setRankTitle(getRankInfo(stats).title);
+    setLevelInfo(getLevelInfo(stats));
+  }, [showWinner]);
+
+  useEffect(() => {
+    return () => {
+      if (xpGainTimerRef.current) clearTimeout(xpGainTimerRef.current);
+    };
+  }, []);
 
   // Initialize
   useEffect(() => {
@@ -223,17 +274,34 @@ export default function GamePage() {
     }
     localStorage.setItem(`ek_player_${gameId}`, pid);
     setPlayerId(pid);
+    const stats = getStats();
+    setRankTitle(getRankInfo(stats).title);
+    setLevelInfo(getLevelInfo(stats));
     fetchGame(pid);
   }, [gameId, fetchGame, playerIdParam, router]);
+
+  // Tune polling frequency by tab visibility to reduce background load.
+  useEffect(() => {
+    const updatePolling = () => {
+      const hidden = document.hidden;
+      setPollIntervalMs(hidden ? 2800 : 1300);
+      if (!hidden) {
+        void poll();
+      }
+    };
+    updatePolling();
+    document.addEventListener('visibilitychange', updatePolling);
+    return () => document.removeEventListener('visibilitychange', updatePolling);
+  }, [poll]);
 
   // Polling — stable interval, poll callback uses refs to read latest state
   useEffect(() => {
     if (!playerId) return;
-    pollIntervalRef.current = setInterval(poll, 1500);
+    pollIntervalRef.current = setInterval(poll, pollIntervalMs);
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [playerId, poll]);
+  }, [playerId, poll, pollIntervalMs]);
 
   // Play turn-start sound + vibrate on mobile
   useEffect(() => {
@@ -276,6 +344,12 @@ export default function GamePage() {
       turnsRemaining: game?.turnsRemaining ?? 0,
       pendingAction: game?.pendingAction?.type ?? null,
       selectedCards,
+      progression: {
+        level: levelInfo.level,
+        levelProgressPct: Math.round(levelInfo.progress * 100),
+        xpToNext: Math.max(0, levelInfo.nextLevelXp - levelInfo.xp),
+        xpGain,
+      },
       ui: {
         selectingTarget,
         selectingThreeTarget,
@@ -310,6 +384,8 @@ export default function GamePage() {
     showDefuseModal,
     showSeeFuture,
     showWinner,
+    levelInfo,
+    xpGain,
   ]);
 
   // Send action
@@ -331,7 +407,7 @@ export default function GamePage() {
       // Sound based on action type
       if (actionData.type === 'play_card') {
         sounds?.cardPlay();
-        recordCardPlayed();
+        applyProgressUpdate(recordCardPlayed());
         // Flash screen border with card color
         const playedCard = myPlayer?.hand.find((c: Card) => c.id === actionData.cardId);
         if (playedCard) {
@@ -341,13 +417,19 @@ export default function GamePage() {
         }
       } else if (actionData.type === 'draw') {
         sounds?.cardDraw();
+      } else if (actionData.type === 'defuse_place') {
+        applyProgressUpdate(recordDefuseUsed());
+      } else if (actionData.type === 'steal_target') {
+        applyProgressUpdate(recordCardsStolen(1));
+      } else if (actionData.type === 'three_of_kind_target') {
+        applyProgressUpdate(recordCardsStolen(1));
       }
 
       // Detect self-explosion
       const me = data.game.players.find((p: Player) => p.id === playerId);
       if (me && !me.isAlive) {
         triggerExplosion();
-        recordExplosion();
+        applyProgressUpdate(recordExplosion());
       }
 
       handlePendingAction(data.game, playerId);
@@ -487,6 +569,51 @@ export default function GamePage() {
     }
   }
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (event.key === '?') {
+        event.preventDefault();
+        setShowHotkeys(prev => !prev);
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        setSelectedCards([]);
+        setSelectingTarget(false);
+        setSelectingThreeTarget(false);
+        setShowHotkeys(false);
+        return;
+      }
+
+      if (!game || game.status !== 'playing' || showWinner) return;
+
+      if (event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        drawCard();
+        return;
+      }
+
+      if ((event.key === 'Enter' || event.key.toLowerCase() === 'p') && canPlay) {
+        event.preventDefault();
+        playSelected();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        setShowLog(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canPlay, drawCard, game, playSelected, showWinner]);
+
   // --- RENDER ---
 
   if (loading) {
@@ -592,23 +719,6 @@ export default function GamePage() {
     ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
     : undefined;
 
-  const selectedCard = selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null;
-  const canPlayPair = selectedCards.length === 2 && !!selectedCard && isCatCard(selectedCard.type);
-  const canPlayTriple = selectedCards.length === 3 && !!selectedCard && isCatCard(selectedCard.type);
-  const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
-  const canPlay = isMyTurn && !hasPendingAction && (canPlaySingle || canPlayPair || canPlayTriple) && !actionLoading;
-  const favorGiveMode = game.pendingAction?.type === 'favor_give' && isPendingOnMe;
-  const actionHint = getActionHint({
-    isMyTurn,
-    hasPendingAction,
-    selectingTarget,
-    selectingThreeTarget,
-    favorGiveMode,
-    canPlay,
-    selectedCards,
-    actionLoading,
-  });
-
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative">
       {/* Particle canvases */}
@@ -657,6 +767,16 @@ export default function GamePage() {
               <p className="text-text-muted mb-6">
                 {game.winnerId === playerId ? 'You survived all the Exploding Kittens!' : 'Better luck next time!'}
               </p>
+              {game.winnerId === playerId && (
+                <div className="mb-5 text-xs uppercase tracking-[0.08em]">
+                  <span className="px-3 py-1 rounded-full border border-warning/40 bg-warning/10 text-warning font-bold">
+                    Rank: {rankTitle}
+                  </span>
+                  <p className="mt-2 text-text-muted normal-case tracking-normal">
+                    Level {levelInfo.level} • {Math.max(0, levelInfo.nextLevelXp - levelInfo.xp)} XP to next level
+                  </p>
+                </div>
+              )}
               <div className="flex flex-col gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -703,6 +823,42 @@ export default function GamePage() {
 
       {/* Stats modal */}
       <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
+
+      {/* Keyboard shortcut helper */}
+      <AnimatePresence>
+        {showHotkeys && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4"
+            onClick={() => setShowHotkeys(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              className="glass-panel rounded-3xl p-5 max-w-sm w-full border border-border"
+            >
+              <p className="display-font text-xl text-warning mb-3">Speed Controls</p>
+              <div className="space-y-2 text-sm">
+                <HotkeyItem keyLabel="D" description="Draw card" />
+                <HotkeyItem keyLabel="Enter / P" description="Play selected cards" />
+                <HotkeyItem keyLabel="L" description="Toggle game log" />
+                <HotkeyItem keyLabel="?" description="Toggle this shortcut sheet" />
+                <HotkeyItem keyLabel="Esc" description="Clear selections / close overlays" />
+              </div>
+              <button
+                onClick={() => setShowHotkeys(false)}
+                className="w-full mt-4 py-2.5 rounded-xl bg-surface-light border border-border hover:border-accent text-text font-bold"
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* See the Future modal */}
       <AnimatePresence>
@@ -796,6 +952,20 @@ export default function GamePage() {
           />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border border-success/35 bg-success/10 min-w-[88px]">
+            <span className="text-[10px] font-black text-success uppercase">Lv {levelInfo.level}</span>
+            <div className="h-1 w-12 rounded-full bg-surface overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-success to-accent" style={{ width: `${Math.round(levelInfo.progress * 100)}%` }} />
+            </div>
+          </div>
+          <button
+            onClick={() => setShowHotkeys(prev => !prev)}
+            className="w-8 h-8 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-xs hover:border-accent transition-colors"
+            title="Keyboard shortcuts"
+            aria-label="Toggle keyboard shortcuts"
+          >
+            HK
+          </button>
           <SoundToggle />
           <QuickEmotes onEmote={handleEmote} />
         </div>
@@ -829,7 +999,7 @@ export default function GamePage() {
       )}
 
       {/* Main game area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-3 md:p-4 overflow-hidden relative game-bg table-aura">
+      <div className="flex-1 flex flex-col items-center justify-start md:justify-center gap-2 md:gap-3 p-2 md:p-4 overflow-y-auto overflow-x-hidden relative game-bg table-aura">
         {/* Floating emote */}
         <AnimatePresence>
           {floatingEmote && (
@@ -879,11 +1049,46 @@ export default function GamePage() {
           {actionHint}
         </motion.div>
 
+        <AnimatePresence>
+          {xpGain !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="text-xs font-black tracking-[0.08em] uppercase text-success bg-success/10 border border-success/40 rounded-full px-3 py-1"
+            >
+              +{xpGain} XP
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {game.logs.length > 0 && (
+          <motion.div
+            key={game.logs[game.logs.length - 1].timestamp}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-xl w-full text-center text-[11px] md:text-xs text-text bg-surface/65 border border-border/70 rounded-full px-3 py-1.5 truncate"
+            title={game.logs[game.logs.length - 1].message}
+          >
+            Last action: {game.logs[game.logs.length - 1].message}
+          </motion.div>
+        )}
+
         {/* Draw & Discard piles */}
         <div className="flex items-center gap-6 md:gap-10 rounded-3xl bg-surface/60 border border-border/70 px-6 py-5 shadow-xl">
           <DrawPile count={game.deck.length} onClick={drawCard} disabled={actionLoading || hasPendingAction} isMyTurn={isMyTurn} />
           <DiscardPile cards={game.discardPile} />
         </div>
+
+        <ComboCoach
+          hand={myPlayer?.hand || []}
+          isMyTurn={isMyTurn}
+          hasPendingAction={hasPendingAction}
+          selectingTarget={selectingTarget}
+          selectingThreeTarget={selectingThreeTarget}
+          deckSize={game.deck.length}
+          alivePlayers={alivePlayers}
+        />
 
         {/* Game log toggle */}
         <button onClick={() => setShowLog(!showLog)} className="text-xs text-text-muted hover:text-accent transition-colors">
@@ -941,6 +1146,11 @@ export default function GamePage() {
             )}
           </div>
         </div>
+        <div className="px-3 pb-2">
+          <p className="text-[10px] text-text-muted">
+            Hotkeys: <span className="text-text">D</span> draw, <span className="text-text">Enter/P</span> play, <span className="text-text">L</span> log, <span className="text-text">?</span> help
+          </p>
+        </div>
 
         {/* Hand */}
         <div className="pb-3 safe-bottom">
@@ -952,6 +1162,15 @@ export default function GamePage() {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function HotkeyItem({ keyLabel, description }: { keyLabel: string; description: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-border bg-surface-light/70 px-3 py-2">
+      <span className="text-xs font-black px-2 py-0.5 rounded-md bg-surface border border-border">{keyLabel}</span>
+      <span className="text-text-muted">{description}</span>
     </div>
   );
 }
