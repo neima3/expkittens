@@ -130,6 +130,13 @@ export default function GamePage() {
     actionLoading,
   }), [isMyTurn, hasPendingAction, selectingTarget, selectingThreeTarget, favorGiveMode, canPlay, selectedCards, actionLoading]);
 
+  const selectableTargets = useMemo(() =>
+    selectingTarget && game
+      ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
+      : undefined,
+    [selectingTarget, game, playerId]
+  );
+
   const applyProgressUpdate = useCallback((update: ProgressUpdate) => {
     if (update.gainedXp > 0) {
       setXpGain(update.gainedXp);
@@ -760,12 +767,6 @@ export default function GamePage() {
   }
 
   // --- ACTIVE GAME ---
-  const selectableTargets = useMemo(() =>
-    selectingTarget
-      ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
-      : undefined,
-    [selectingTarget, game.players, playerId]
-  );
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative game-container-layer">
