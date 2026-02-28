@@ -187,3 +187,32 @@ App was still very slow and buggy on iPhone Safari despite previous CSS compatib
 ### Next-agent TODOs / ideas
 - Add a mini post-match progression summary card showing XP gained this match and newly unlocked achievements.
 - Add quick “party rematch” vote flow for multiplayer lobbies to reduce friction between rounds.
+
+## 2026-02-27 night — Mobile Touch & Stale Closure Fixes
+
+### Issues Found & Fixed (3 files, 33 insertions, 15 deletions)
+
+**Touch Interaction Fixes:**
+- Removed remaining `whileHover` from DrawPile — hover doesn't work on touch devices and can cause visual glitches
+
+**Stale Closure Bug Fixes:**
+- Fixed `fetchGame` useCallback — removed unused `applyProgressUpdate` from deps array
+- Fixed `playSelected` function — converted to useCallback and uses `gameRef.current` to avoid stale state
+- Fixed `handleTargetSelect` function — uses `gameRef.current` and refs instead of potentially stale state
+
+**Mobile UX Improvements:**
+- Added scroll container (`max-h-[40vh] overflow-y-auto scroll-touch`) to ThreeOfKindModal card grid for narrow screens
+- Improved loading state with text feedback ("Loading game...")
+- Enhanced "Game not found" screen with emoji, explanation text, retry button, and proper mobile styling
+- All error screen buttons now have `min-h-[44px]` for proper touch targets
+
+### Code Quality
+- All hooks are now at the top level of components (no Rules of Hooks violations)
+- All event handlers use refs to avoid stale closures
+- Error states have clear recovery actions
+
+### Deployment
+- `npm run build` — 0 errors, 0 warnings
+- Committed: `db80d5e`
+- Pushed to `origin/main`
+- Deployed to Vercel production: `https://expkittens.nak.im`

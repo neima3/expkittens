@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #110f1d;
-  --color-surface: #18122b;
-  --color-surface-light: #251a3e;
+  --color-bg: #090714;
+  --color-surface: #130f25;
+  --color-surface-light: #1f183b;
   --color-accent: #ff5f2e;
   --color-accent-hover: #ff844f;
-  --color-danger: #ff4363;
-  --color-success: #43d089;
-  --color-warning: #ffc658;
+  --color-danger: #ff3355;
+  --color-success: #2bd47c;
+  --color-warning: #ffb833;
   --color-text: #f8f6ff;
-  --color-text-muted: #b1abca;
-  --color-border: #443468;
+  --color-text-muted: #a097bd;
+  --color-border: #3b2d5c;
   --font-game: 'Space Grotesk', system-ui, sans-serif;
   --font-display: 'Bungee', 'Space Grotesk', system-ui, sans-serif;
 }
@@ -19,25 +19,22 @@
 * {
   -webkit-tap-highlight-color: transparent;
   box-sizing: border-box;
-  /* Prevent double-tap zoom on iOS Safari */
   touch-action: manipulation;
 }
 
 body {
   font-family: var(--font-game);
   background:
-    radial-gradient(circle at 18% 12%, rgba(255, 95, 46, 0.24), transparent 34%),
-    radial-gradient(circle at 82% 18%, rgba(67, 208, 137, 0.2), transparent 30%),
-    radial-gradient(circle at 50% 90%, rgba(91, 145, 255, 0.16), transparent 44%),
-    linear-gradient(145deg, #0f0c19 0%, #110f1d 38%, #151126 100%);
+    radial-gradient(circle at 10% 10%, rgba(255, 95, 46, 0.15), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(139, 44, 255, 0.12), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(43, 212, 124, 0.08), transparent 50%),
+    linear-gradient(160deg, #0a0714 0%, #0d0a1b 40%, #110d23 100%);
   color: var(--color-text);
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   min-height: 100dvh;
-  /* Fallback for older iOS Safari that doesn't support dvh */
   min-height: -webkit-fill-available;
   position: relative;
-  /* Prevent iOS Safari pull-to-refresh and elastic overscroll */
   overflow: hidden;
 }
 
@@ -46,56 +43,55 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.25;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 36px 36px;
-  -webkit-mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.92), transparent 95%);
-  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.92), transparent 95%);
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
   z-index: -1;
+  mix-blend-mode: overlay;
 }
 
 body::after {
   content: '';
   position: fixed;
-  inset: -140px;
+  inset: 0;
   pointer-events: none;
-  opacity: 0.3;
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 12px 12px;
-  -webkit-filter: blur(0.3px);
-  filter: blur(0.3px);
-  z-index: -1;
+  opacity: 0.15;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1), transparent 85%);
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 1), transparent 85%);
+  z-index: -2;
 }
 
 a,
 button {
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .display-font {
   font-family: var(--font-display);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
 .glass-panel {
-  background: linear-gradient(165deg, rgba(37, 26, 62, 0.86), rgba(24, 18, 43, 0.9));
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, white 14%);
+  background: linear-gradient(165deg, rgba(31, 24, 59, 0.75), rgba(19, 15, 37, 0.85));
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 22px 48px rgba(10, 6, 20, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+    0 24px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
 }
 
 /* Reduce expensive backdrop-filter on mobile */
 @media (max-width: 767px) {
   .glass-panel {
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
-    background: linear-gradient(165deg, rgba(37, 26, 62, 0.92), rgba(24, 18, 43, 0.95));
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    background: linear-gradient(165deg, rgba(31, 24, 59, 0.85), rgba(19, 15, 37, 0.95));
   }
 }
 
@@ -109,61 +105,91 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 700;
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, white 20%);
-  background: rgba(22, 17, 39, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(19, 15, 37, 0.85);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
 }
 
 .cta-primary,
 .cta-secondary,
 .cta-ghost {
   border-radius: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  position: relative;
+  overflow: hidden;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.cta-primary::after,
+.cta-secondary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform: skewX(-20deg);
+  transition: 0.5s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cta-primary:hover::after,
+  .cta-secondary:hover::after {
+    left: 200%;
+  }
 }
 
 .cta-primary {
   color: white;
-  background: linear-gradient(110deg, var(--color-accent) 0%, #ff8d44 100%);
-  box-shadow: 0 14px 30px rgba(255, 95, 46, 0.32);
+  background: linear-gradient(135deg, #ff432e 0%, #ff8d44 100%);
+  box-shadow: 0 8px 24px rgba(255, 95, 46, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 141, 68, 0.5);
 }
 
 .cta-secondary {
   color: #fff;
-  background: linear-gradient(115deg, #20a4f3 0%, #2fd19f 100%);
-  box-shadow: 0 14px 30px rgba(38, 170, 213, 0.28);
+  background: linear-gradient(135deg, #20a4f3 0%, #2fd19f 100%);
+  box-shadow: 0 8px 24px rgba(38, 170, 213, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(47, 209, 159, 0.5);
 }
 
 .cta-ghost {
   color: var(--color-text);
-  background: rgba(37, 26, 62, 0.72);
-  border: 1px solid var(--color-border);
+  background: rgba(31, 24, 59, 0.72);
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 
 /* Only apply hover effects on devices with pointer (not touch) */
 @media (hover: hover) and (pointer: fine) {
   .cta-primary:hover {
-    box-shadow: 0 18px 34px rgba(255, 95, 46, 0.4);
+    box-shadow: 0 12px 32px rgba(255, 95, 46, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
   }
   .cta-secondary:hover {
-    box-shadow: 0 18px 34px rgba(38, 170, 213, 0.38);
+    box-shadow: 0 12px 32px rgba(38, 170, 213, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
   }
   .cta-ghost:hover {
-    border-color: color-mix(in srgb, var(--color-accent) 60%, white 40%);
+    border-color: rgba(255,255,255,0.25);
     background: rgba(45, 31, 75, 0.82);
+    transform: translateY(-2px);
   }
 }
 
 /* Touch devices: apply active state instead of hover */
 @media (hover: none) {
   .cta-primary:active {
-    box-shadow: 0 18px 34px rgba(255, 95, 46, 0.4);
+    box-shadow: 0 4px 12px rgba(255, 95, 46, 0.4);
+    transform: scale(0.97);
   }
   .cta-secondary:active {
-    box-shadow: 0 18px 34px rgba(38, 170, 213, 0.38);
+    box-shadow: 0 4px 12px rgba(38, 170, 213, 0.4);
+    transform: scale(0.97);
   }
   .cta-ghost:active {
-    border-color: color-mix(in srgb, var(--color-accent) 60%, white 40%);
     background: rgba(45, 31, 75, 0.82);
+    transform: scale(0.97);
   }
 }
 

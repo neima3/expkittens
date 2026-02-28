@@ -160,14 +160,14 @@ function HomeContent() {
               </span>
             </div>
 
-            <motion.div className="text-7xl md:text-8xl mb-2" animate={{ y: [0, -8, 0] }} transition={{ duration: 2.3, repeat: Infinity }}>
+            <motion.div className="text-7xl md:text-[100px] mb-2 drop-shadow-[0_0_30px_rgba(255,95,46,0.6)]" animate={{ y: [0, -10, 0], rotate: [-2, 2, -2] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
               💣
             </motion.div>
 
-            <h1 className="display-font text-4xl md:text-5xl leading-tight text-transparent bg-clip-text bg-gradient-to-r from-[#ff8d44] via-[#ffd27a] to-[#ff5f2e] mb-2">
-              Exploding Kittens
+            <h1 className="display-font text-5xl md:text-6xl leading-tight text-transparent bg-clip-text bg-gradient-to-b from-[#fff] via-[#ffd27a] to-[#ff432e] mb-3 filter drop-shadow-[0_4px_16px_rgba(255,95,46,0.4)]">
+              EXPLODING<br/>KITTENS
             </h1>
-            <p className="subtle-text text-base md:text-lg mb-8">
+            <p className="subtle-text text-base md:text-lg mb-8 font-medium">
               Bluff hard. Play dirty. Don&apos;t pull the bomb.
             </p>
 

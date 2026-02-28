@@ -812,9 +812,20 @@ export default function GamePage() {
       {/* Explosion overlay */}
       <AnimatePresence>
         {showExplosion && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="absolute inset-0 bg-danger/20" />
-            <motion.div initial={{ scale: 0 }} animate={{ scale: [0, 2.5, 0] }} transition={{ duration: 1.5, times: [0, 0.4, 1] }} className="text-[120px]">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <motion.div 
+              className="absolute inset-0 bg-danger/40" 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0.8, 0] }}
+              transition={{ duration: 1.5, times: [0, 0.1, 0.3, 1] }}
+            />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)] pointer-events-none" />
+            <motion.div 
+              initial={{ scale: 0, rotate: -20 }} 
+              animate={{ scale: [0, 3, 2.5, 0], rotate: [-20, 10, -5, 20] }} 
+              transition={{ duration: 1.5, times: [0, 0.2, 0.4, 1], ease: "anticipate" }} 
+              className="text-[140px] drop-shadow-[0_0_60px_rgba(255,51,85,0.8)] filter"
+            >
               💥
             </motion.div>
           </motion.div>
@@ -824,60 +835,83 @@ export default function GamePage() {
       {/* Winner modal */}
       <AnimatePresence>
         {showWinner && game.winnerId && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overscroll-contain">
-            <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-6 md:p-8 text-center max-w-sm w-full border-2 border-warning shadow-2xl max-h-[90vh] overflow-y-auto scroll-touch">
-              <motion.div animate={{ rotate: [0, -10, 10, -10, 0] }} transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }} className="text-7xl mb-4">
+          <motion.div initial={{ opacity: 0, backdropFilter: 'blur(0px)' }} animate={{ opacity: 1, backdropFilter: 'blur(8px)' }} className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overscroll-contain">
+            <motion.div 
+              initial={{ scale: 0.8, y: 50, opacity: 0 }} 
+              animate={{ scale: 1, y: 0, opacity: 1 }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative bg-[linear-gradient(165deg,#1f183b_0%,#130f25_100%)] rounded-[2.5rem] p-8 md:p-10 text-center max-w-sm w-full border border-white/10 shadow-[0_32px_64px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] max-h-[90vh] overflow-y-auto scroll-touch"
+            >
+              {/* Cinematic background light */}
+              <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-40 blur-[60px] pointer-events-none rounded-full ${game.winnerId === playerId ? 'bg-warning/20' : 'bg-danger/20'}`} />
+
+              <motion.div animate={{ rotate: [0, -5, 5, -5, 0], scale: [1, 1.1, 1] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} className="text-8xl mb-6 drop-shadow-[0_0_30px_rgba(255,184,51,0.4)]">
                 {game.winnerId === playerId ? '🏆' : '💀'}
               </motion.div>
-              <h2 className="text-3xl font-black mb-2">
-                {game.winnerId === playerId ? 'You Win!' : `${game.players.find(p => p.id === game.winnerId)?.name} Wins!`}
+              
+              <h2 className="display-font text-4xl mb-3 bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent drop-shadow-md">
+                {game.winnerId === playerId ? 'VICTORY' : 'DEFEAT'}
               </h2>
-              <p className="text-text-muted mb-6">
-                {game.winnerId === playerId ? 'You survived all the Exploding Kittens!' : 'Better luck next time!'}
+              <p className="text-text-muted mb-8 font-medium">
+                {game.winnerId === playerId ? 'You survived the exploding kittens!' : `${game.players.find(p => p.id === game.winnerId)?.name} survived.`}
               </p>
+
               {game.winnerId === playerId && (
-                <div className="mb-5 text-xs uppercase tracking-[0.08em]">
-                  <span className="px-3 py-1 rounded-full border border-warning/40 bg-warning/10 text-warning font-bold">
-                    Rank: {rankTitle}
-                  </span>
-                  <p className="mt-2 text-text-muted normal-case tracking-normal">
-                    Level {levelInfo.level} • {Math.max(0, levelInfo.nextLevelXp - levelInfo.xp)} XP to next level
-                  </p>
+                <div className="mb-8 bg-black/30 border border-white/5 rounded-2xl p-4 shadow-inner">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <span className="px-3 py-1 rounded-full border border-warning/30 bg-warning/10 text-warning text-[10px] font-black uppercase tracking-widest shadow-[0_0_12px_rgba(255,184,51,0.2)]">
+                      {rankTitle}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1.5 px-1">
+                    <span>Lv.{levelInfo.level}</span>
+                    <span>{Math.max(0, levelInfo.nextLevelXp - levelInfo.xp)} XP to next</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-black/60 overflow-hidden shadow-inner">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-success/50 to-success rounded-full"
+                      style={{ boxShadow: '0 0 10px rgba(43,212,124,0.6)' }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.round(levelInfo.progress * 100)}%` }}
+                    />
+                  </div>
                 </div>
               )}
-              <div className="flex flex-col gap-3">
+
+              <div className="flex flex-col gap-3 relative z-10">
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={handleRematch}
                   disabled={rematchLoading}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold shadow-lg shadow-accent/20 disabled:opacity-50 min-h-[44px]"
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-black text-lg tracking-wide shadow-[0_8px_24px_rgba(255,95,46,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-[#ff8d44]/50 disabled:opacity-50 min-h-[56px] relative overflow-hidden group"
                 >
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)] -skew-x-12 -translate-x-full group-hover:translate-x-full duration-1000" />
                   {rematchLoading ? (
                     <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Creating...
                     </span>
                   ) : (
-                    game.isMultiplayer ? '🏠 Play Again' : '🔄 Rematch'
+                    game.isMultiplayer ? 'PLAY AGAIN' : 'REMATCH'
                   )}
                 </motion.button>
                 <div className="flex gap-2">
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => router.push('/')}
-                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent/50 transition-colors min-h-[44px]"
+                    className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/90 font-bold hover:bg-white/10 transition-colors shadow-sm text-sm"
                   >
-                    🏠 Home
+                    Home
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowStats(true)}
-                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent/50 transition-colors min-h-[44px]"
+                    className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/90 font-bold hover:bg-white/10 transition-colors shadow-sm text-sm"
                   >
-                    📊 Stats
+                    Stats
                   </motion.button>
-                  <button onClick={() => setShowWinner(false)} className="px-4 py-3 rounded-xl bg-surface-light border border-border text-text-muted font-bold active:border-accent/50 transition-colors min-h-[44px]">
-                    👁 Board
+                  <button onClick={() => setShowWinner(false)} className="px-5 py-3.5 rounded-xl bg-transparent text-text-muted hover:text-white transition-colors text-sm font-bold">
+                    Board
                   </button>
                 </div>
               </div>
@@ -1169,27 +1203,44 @@ export default function GamePage() {
       </div>
 
       {/* Bottom bar: player info + hand */}
-      <div className="glass-panel border-x-0 border-b-0 rounded-none safe-x">
+      <div className="glass-panel border-x-0 border-b-0 rounded-none safe-x shadow-[0_-8px_32px_rgba(0,0,0,0.5)] z-20">
         {/* My info + actions */}
-        <div className="flex items-center justify-between px-3 py-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{AVATARS[myPlayer?.avatar || 0]}</span>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="text-3xl drop-shadow-md">{AVATARS[myPlayer?.avatar || 0]}</span>
+              {isMyTurn && myPlayer?.isAlive && (
+                <motion.div
+                  animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-accent border-2 border-[#130f25] shadow-[0_0_8px_var(--color-accent)]"
+                />
+              )}
+            </div>
             <div>
-              <p className={`font-bold text-sm leading-none ${myPlayer && !myPlayer.isAlive ? 'line-through text-danger' : ''}`}>
+              <p className={`font-black text-[15px] tracking-wide leading-none mb-1 text-white/95 ${myPlayer && !myPlayer.isAlive ? 'line-through text-danger/80' : ''}`}>
                 {myPlayer?.name || 'You'}
               </p>
-              <p className="text-[11px] text-text-muted">
-                {myPlayer?.isAlive ? `${myPlayer?.hand.length} cards` : 'Eliminated'}
-              </p>
+              <div className="flex items-center gap-1.5">
+                {myPlayer?.isAlive ? (
+                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded text-white/70">
+                    {myPlayer.hand.length} <span className="opacity-50">CARDS</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-danger font-bold uppercase tracking-widest bg-danger/10 px-1.5 py-0.5 rounded">
+                    💀 DEAD
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {/* Selected card info */}
             {selectedCard && (
-              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-light/80 border border-border">
-                <span className="text-sm">{CARD_INFO[selectedCard.type].emoji}</span>
-                <span className="text-[11px] text-text-muted max-w-[80px] sm:max-w-[100px] truncate">{CARD_INFO[selectedCard.type].name}</span>
+              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 border border-white/10 shadow-inner">
+                <span className="text-base drop-shadow-sm">{CARD_INFO[selectedCard.type].emoji}</span>
+                <span className="text-[10px] font-bold text-white/80 max-w-[80px] sm:max-w-[120px] truncate uppercase tracking-wider">{CARD_INFO[selectedCard.type].name}</span>
               </motion.div>
             )}
 
@@ -1200,24 +1251,24 @@ export default function GamePage() {
                 animate={{ opacity: 1, scale: 1 }}
                 whileTap={{ scale: 0.93 }}
                 onClick={playSelected}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-sm shadow-lg shadow-accent/20 whitespace-nowrap min-h-[44px]"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-black text-sm tracking-wide shadow-[0_4px_16px_rgba(255,95,46,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] whitespace-nowrap min-h-[44px] border border-[#ff8d44]/50"
               >
-                {canPlayPair ? 'Steal (Pair)' : canPlayTriple ? 'Steal (Triple)' : `Play`}
+                {canPlayPair ? 'STEAL (PAIR)' : canPlayTriple ? 'STEAL (TRIPLE)' : 'PLAY'}
               </motion.button>
             )}
             {selectedCards.length > 0 && (
-              <button onClick={() => setSelectedCards([])} className="w-10 h-10 rounded-lg bg-surface-light text-text-muted text-sm flex items-center justify-center">✕</button>
+              <button onClick={() => setSelectedCards([])} className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-text-muted text-sm flex items-center justify-center transition-colors">✕</button>
             )}
           </div>
         </div>
-        <div className="px-3 pb-1.5 hidden sm:block">
-          <p className="text-[11px] text-text-muted">
-            Hotkeys: <span className="text-text">D</span> draw, <span className="text-text">Enter/P</span> play, <span className="text-text">L</span> log, <span className="text-text">?</span> help
+        <div className="px-4 py-1.5 hidden sm:block bg-black/20">
+          <p className="text-[10px] text-text-muted uppercase tracking-widest font-bold">
+            Hotkeys: <span className="text-white">D</span> draw, <span className="text-white">Enter/P</span> play, <span className="text-white">L</span> log, <span className="text-white">?</span> help
           </p>
         </div>
 
         {/* Hand */}
-        <div className="pb-3 safe-bottom">
+        <div className="pb-1 safe-bottom bg-[#0a0714]">
           <PlayerHand
             cards={myPlayer?.hand || []}
             selectedCards={selectedCards}
