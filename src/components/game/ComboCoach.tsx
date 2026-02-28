@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import type { Card } from '@/types/game';
 import { CAT_CARD_TYPES } from '@/types/game';
@@ -26,7 +27,7 @@ function countByType(cards: Card[]) {
   return byType;
 }
 
-export default function ComboCoach({
+export default memo(function ComboCoach({
   hand,
   isMyTurn,
   hasPendingAction,
@@ -110,7 +111,7 @@ export default function ComboCoach({
       <p className="text-xs md:text-sm text-text-muted leading-relaxed">{tips[0]}</p>
     </motion.div>
   );
-}
+})
 
 function StatPill({
   label,

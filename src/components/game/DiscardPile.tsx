@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Card } from '@/types/game';
 import { CARD_INFO } from '@/types/game';
@@ -8,7 +9,7 @@ interface DiscardPileProps {
   cards: Card[];
 }
 
-export default function DiscardPile({ cards }: DiscardPileProps) {
+export default memo(function DiscardPile({ cards }: DiscardPileProps) {
   const topCard = cards.length > 0 ? cards[cards.length - 1] : null;
   const info = topCard ? CARD_INFO[topCard.type] : null;
 
@@ -40,4 +41,4 @@ export default function DiscardPile({ cards }: DiscardPileProps) {
       </span>
     </div>
   );
-}
+})

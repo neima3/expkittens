@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import type { Card, CardType } from '@/types/game';
 import { CARD_INFO } from '@/types/game';
@@ -53,7 +54,7 @@ function getCardPattern(type: CardType): string {
   }
 }
 
-export default function GameCard({
+export default memo(function GameCard({
   card,
   onClick,
   selected,
@@ -94,7 +95,7 @@ export default function GameCard({
       whileTap={!disabled ? { scale: 0.93 } : undefined}
       onClick={!disabled ? onClick : undefined}
       disabled={disabled}
-      className={`${s.w} ${s.h} ${s.r} relative flex flex-col items-center justify-center border-2 transition-shadow shadow-lg flex-shrink-0 overflow-hidden
+      className={`${s.w} ${s.h} ${s.r} game-card-layer relative flex flex-col items-center justify-center border-2 transition-shadow shadow-lg flex-shrink-0 overflow-hidden
         ${selected ? 'border-warning ring-2 ring-warning/50 z-10' : 'border-white/12'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:shadow-2xl'}
         ${glowPlayable && !disabled && !selected ? 'animate-pulse-glow' : ''}
@@ -133,4 +134,4 @@ export default function GameCard({
       )}
     </motion.button>
   );
-}
+})

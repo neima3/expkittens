@@ -122,11 +122,12 @@ function HomeContent() {
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6 relative overflow-x-hidden overflow-y-auto scroll-touch">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      {/* Floating tokens — hidden on mobile for performance */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden md:block">
         {FLOATING_TOKENS.map(token => (
           <motion.div
             key={token.symbol + token.left}
-            className="absolute text-4xl md:text-5xl opacity-15"
+            className="absolute text-5xl opacity-15"
             style={{ top: token.top, left: token.left }}
             animate={{ y: [0, -12, 0], rotate: [0, 8, -8, 0] }}
             transition={{ duration: token.duration, repeat: Infinity, delay: token.delay }}

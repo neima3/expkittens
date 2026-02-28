@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import type { Player } from '@/types/game';
 
@@ -13,7 +14,7 @@ interface OpponentBarProps {
   selectablePlayerIds?: string[];
 }
 
-export default function OpponentBar({
+export default memo(function OpponentBar({
   players,
   currentPlayerId,
   myId,
@@ -64,4 +65,4 @@ export default function OpponentBar({
       })}
     </div>
   );
-}
+})

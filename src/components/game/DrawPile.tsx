@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
 interface DrawPileProps {
@@ -9,7 +10,7 @@ interface DrawPileProps {
   isMyTurn: boolean;
 }
 
-export default function DrawPile({ count, onClick, disabled, isMyTurn }: DrawPileProps) {
+export default memo(function DrawPile({ count, onClick, disabled, isMyTurn }: DrawPileProps) {
   return (
     <motion.button
       id="draw-pile-btn"
@@ -40,4 +41,4 @@ export default function DrawPile({ count, onClick, disabled, isMyTurn }: DrawPil
       )}
     </motion.button>
   );
-}
+})

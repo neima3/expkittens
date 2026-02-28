@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -84,36 +84,42 @@ export default function GamePage() {
   const [showStats, setShowStats] = useState(false);
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [rematchLoading, setRematchLoading] = useState(false);
-  const [pollIntervalMs, setPollIntervalMs] = useState(1300);
+  const [pollIntervalMs, setPollIntervalMs] = useState(2500);
   const [rankTitle, setRankTitle] = useState('Rookie Spark');
   const [levelInfo, setLevelInfo] = useState(() => getLevelInfo(getStats()));
   const [xpGain, setXpGain] = useState<number | null>(null);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const explosionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confettiRef = useRef<HTMLCanvasElement>(null);
   const particleRef = useRef<HTMLCanvasElement>(null);
   const hasRecordedResult = useRef(false);
   const gameRef = useRef<GameState | null>(null);
   const actionLoadingRef = useRef(false);
+  const pollAbortRef = useRef<AbortController | null>(null);
 
   // Keep refs in sync with state for use in poll callback
   gameRef.current = game;
   actionLoadingRef.current = actionLoading;
 
-  const myPlayer = game?.players.find(p => p.id === playerId);
-  const currentPlayer = game ? game.players[game.currentPlayerIndex] : null;
+  const myPlayer = useMemo(() => game?.players.find(p => p.id === playerId), [game?.players, playerId]);
+  const currentPlayer = useMemo(() => game ? game.players[game.currentPlayerIndex] : null, [game?.players, game?.currentPlayerIndex]);
   const isMyTurn = currentPlayer?.id === playerId;
   const hasPendingAction = !!game?.pendingAction;
   const isPendingOnMe = game?.pendingAction?.playerId === playerId;
-  const alivePlayers = game?.players.filter(p => p.isAlive).length ?? 0;
-  const selectedCard = selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null;
+  const alivePlayers = useMemo(() => game?.players.filter(p => p.isAlive).length ?? 0, [game?.players]);
+  const selectedCard = useMemo(
+    () => selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null,
+    [selectedCards, myPlayer?.hand]
+  );
   const canPlayPair = selectedCards.length === 2 && !!selectedCard && isCatCard(selectedCard.type);
   const canPlayTriple = selectedCards.length === 3 && !!selectedCard && isCatCard(selectedCard.type);
   const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
   const canPlay = isMyTurn && !hasPendingAction && (canPlaySingle || canPlayPair || canPlayTriple) && !actionLoading;
   const favorGiveMode = game?.pendingAction?.type === 'favor_give' && isPendingOnMe;
-  const actionHint = getActionHint({
+  const actionHint = useMemo(() => getActionHint({
     isMyTurn,
     hasPendingAction,
     selectingTarget,
@@ -122,7 +128,7 @@ export default function GamePage() {
     canPlay,
     selectedCards,
     actionLoading,
-  });
+  }), [isMyTurn, hasPendingAction, selectingTarget, selectingThreeTarget, favorGiveMode, canPlay, selectedCards, actionLoading]);
 
   const applyProgressUpdate = useCallback((update: ProgressUpdate) => {
     if (update.gainedXp > 0) {
@@ -185,9 +191,14 @@ export default function GamePage() {
   // Poll for updates — uses refs to avoid stale closures and constant interval recreation
   const poll = useCallback(async () => {
     if (!playerId || actionLoadingRef.current) return;
+    // Abort any in-flight poll before starting a new one (prevents race conditions)
+    pollAbortRef.current?.abort();
+    const controller = new AbortController();
+    pollAbortRef.current = controller;
     try {
       const res = await fetch(
-        `/api/games/${gameId}/poll?playerId=${playerId}&lastActionId=${lastActionIdRef.current}`
+        `/api/games/${gameId}/poll?playerId=${playerId}&lastActionId=${lastActionIdRef.current}`,
+        { signal: controller.signal }
       );
       const data = await res.json();
       if (!data.changed || !data.game) return;
@@ -222,8 +233,9 @@ export default function GamePage() {
       if (data.game.status === 'finished') {
         handleGameEnd(data.game);
       }
-    } catch {
-      // Silent
+    } catch (err) {
+      // Silently ignore aborted requests and network errors
+      if (err instanceof DOMException && err.name === 'AbortError') return;
     }
   }, [gameId, playerId]);
 
@@ -233,7 +245,8 @@ export default function GamePage() {
     if (particleRef.current) {
       launchExplosionParticles(particleRef.current, window.innerWidth / 2, window.innerHeight / 2);
     }
-    setTimeout(() => setShowExplosion(false), 1800);
+    if (explosionTimerRef.current) clearTimeout(explosionTimerRef.current);
+    explosionTimerRef.current = setTimeout(() => setShowExplosion(false), 1800);
   }
 
   function handleGameEnd(g: GameState) {
@@ -262,6 +275,9 @@ export default function GamePage() {
   useEffect(() => {
     return () => {
       if (xpGainTimerRef.current) clearTimeout(xpGainTimerRef.current);
+      if (explosionTimerRef.current) clearTimeout(explosionTimerRef.current);
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      pollAbortRef.current?.abort();
     };
   }, []);
 
@@ -280,12 +296,23 @@ export default function GamePage() {
     fetchGame(pid);
   }, [gameId, fetchGame, playerIdParam, router]);
 
-  // Tune polling frequency by tab visibility to reduce background load.
+  // Smart polling: fast when it's your turn or game active, slow when idle/background
+  const isMyTurnRef = useRef(false);
+  isMyTurnRef.current = isMyTurn;
+  const gameStatusRef = useRef<string | undefined>(undefined);
+  gameStatusRef.current = game?.status;
+
   useEffect(() => {
+    const computeInterval = () => {
+      if (document.hidden) return 5000; // Background tab: very slow
+      if (gameStatusRef.current === 'finished') return 8000;
+      if (gameStatusRef.current === 'waiting') return 3000;
+      if (isMyTurnRef.current) return 1500; // My turn: faster
+      return 2500; // Opponent's turn: moderate
+    };
     const updatePolling = () => {
-      const hidden = document.hidden;
-      setPollIntervalMs(hidden ? 2800 : 1300);
-      if (!hidden) {
+      setPollIntervalMs(computeInterval());
+      if (!document.hidden) {
         void poll();
       }
     };
@@ -293,6 +320,18 @@ export default function GamePage() {
     document.addEventListener('visibilitychange', updatePolling);
     return () => document.removeEventListener('visibilitychange', updatePolling);
   }, [poll]);
+
+  // Adjust polling speed when turn changes
+  useEffect(() => {
+    if (document.hidden) return;
+    if (game?.status === 'finished') {
+      setPollIntervalMs(8000);
+    } else if (isMyTurn) {
+      setPollIntervalMs(1500);
+    } else {
+      setPollIntervalMs(2500);
+    }
+  }, [isMyTurn, game?.status]);
 
   // Polling — stable interval, poll callback uses refs to read latest state
   useEffect(() => {
@@ -413,7 +452,8 @@ export default function GamePage() {
         if (playedCard) {
           const cardColor = CARD_INFO[playedCard.type].color;
           setFlashColor(cardColor);
-          setTimeout(() => setFlashColor(null), 300);
+          if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+          flashTimerRef.current = setTimeout(() => setFlashColor(null), 300);
         }
       } else if (actionData.type === 'draw') {
         sounds?.cardDraw();
@@ -444,8 +484,11 @@ export default function GamePage() {
     }
   }
 
-  function handleCardClick(card: Card) {
-    if (game?.pendingAction?.type === 'favor_give' && isPendingOnMe) {
+  const handleCardClick = useCallback((card: Card) => {
+    const g = gameRef.current;
+    const pid = playerId;
+    const myP = g?.players.find(p => p.id === pid);
+    if (g?.pendingAction?.type === 'favor_give' && g?.pendingAction?.playerId === pid) {
       sendAction({ type: 'favor_give', cardId: card.id });
       return;
     }
@@ -455,7 +498,7 @@ export default function GamePage() {
     if (isCatCard(card.type)) {
       setSelectedCards(prev => {
         if (prev.includes(card.id)) return prev.filter(id => id !== card.id);
-        const currentType = prev.length > 0 ? myPlayer?.hand.find(c => c.id === prev[0])?.type : null;
+        const currentType = prev.length > 0 ? myP?.hand.find(c => c.id === prev[0])?.type : null;
         if (currentType && currentType !== card.type) return [card.id];
         if (prev.length >= 3) return prev;
         return [...prev, card.id];
@@ -463,7 +506,7 @@ export default function GamePage() {
     } else {
       setSelectedCards(prev => prev.includes(card.id) ? [] : [card.id]);
     }
-  }
+  }, [playerId]);
 
   function playSelected() {
     if (selectedCards.length === 0) return;
@@ -483,10 +526,12 @@ export default function GamePage() {
     sendAction({ type: 'play_card', cardId: card.id });
   }
 
-  function drawCard() {
-    if (!isMyTurn || hasPendingAction || actionLoading) return;
+  const drawCard = useCallback(() => {
+    const g = gameRef.current;
+    const currentP = g ? g.players[g.currentPlayerIndex] : null;
+    if (currentP?.id !== playerId || !!g?.pendingAction || actionLoadingRef.current) return;
     sendAction({ type: 'draw' });
-  }
+  }, [playerId]);
 
   function handleThreeOfKindSelect(targetId: string, cardType: CardType) {
     sendAction({ type: 'three_of_kind_target', targetPlayerId: targetId, targetCardType: cardType });
@@ -526,9 +571,9 @@ export default function GamePage() {
     }
   }
 
-  function handleEmote(emote: string) {
+  const handleEmote = useCallback((emote: string) => {
     setFloatingEmote(emote);
-  }
+  }, []);
 
   async function handleRematch() {
     if (!game) return;
@@ -715,17 +760,20 @@ export default function GamePage() {
   }
 
   // --- ACTIVE GAME ---
-  const selectableTargets = selectingTarget
-    ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
-    : undefined;
+  const selectableTargets = useMemo(() =>
+    selectingTarget
+      ? game.players.filter(p => p.isAlive && p.id !== playerId && p.hand.length > 0).map(p => p.id)
+      : undefined,
+    [selectingTarget, game.players, playerId]
+  );
 
   return (
-    <div className="h-dvh flex flex-col overflow-hidden relative">
+    <div className="h-dvh flex flex-col overflow-hidden relative game-container-layer">
       {/* Particle canvases */}
       <canvas ref={confettiRef} className="fixed inset-0 w-full h-full pointer-events-none z-[60]" />
       <canvas ref={particleRef} className="fixed inset-0 w-full h-full pointer-events-none z-[55]" />
-      <div className="pointer-events-none absolute -top-28 -left-16 w-64 h-64 rounded-full bg-accent/25 blur-[90px]" />
-      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-success/20 blur-[100px]" />
+      <div className="pointer-events-none absolute -top-28 -left-16 w-64 h-64 rounded-full bg-accent/25 blur-[90px] hidden md:block" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-success/20 blur-[100px] hidden md:block" />
 
       {/* Card play flash overlay */}
       <AnimatePresence>

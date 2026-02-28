@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
 interface DangerMeterProps {
@@ -7,7 +8,7 @@ interface DangerMeterProps {
   alivePlayers: number;
 }
 
-export default function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps) {
+export default memo(function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps) {
   const ekRemaining = Math.max(0, alivePlayers - 1);
   const danger = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
   const percent = Math.round(danger * 100);
@@ -42,4 +43,4 @@ export default function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps
       </span>
     </div>
   );
-}
+})
