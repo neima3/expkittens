@@ -168,7 +168,7 @@ export default function GamePage() {
     } finally {
       setLoading(false);
     }
-  }, [applyProgressUpdate, gameId, playerId]);
+  }, [gameId, playerId]);
 
   function handlePendingAction(g: GameState, pid: string) {
     if (!g.pendingAction || g.pendingAction.playerId !== pid) return;
@@ -515,13 +515,18 @@ export default function GamePage() {
     }
   }, [playerId]);
 
-  function playSelected() {
-    if (selectedCards.length === 0) return;
-    const card = myPlayer?.hand.find(c => c.id === selectedCards[0]);
+  const playSelected = useCallback(() => {
+    const g = gameRef.current;
+    const pid = playerId;
+    const myP = g?.players.find(p => p.id === pid);
+    const selCards = selectedCards;
+    
+    if (selCards.length === 0) return;
+    const card = myP?.hand.find(c => c.id === selCards[0]);
     if (!card) return;
 
-    if (selectedCards.length >= 2 && isCatCard(card.type)) {
-      sendAction({ type: 'play_card', cardId: selectedCards[0], cardIds: selectedCards });
+    if (selCards.length >= 2 && isCatCard(card.type)) {
+      sendAction({ type: 'play_card', cardId: selCards[0], cardIds: selCards });
       return;
     }
 
@@ -531,7 +536,7 @@ export default function GamePage() {
     }
 
     sendAction({ type: 'play_card', cardId: card.id });
-  }
+  }, [playerId, selectedCards]);
 
   const drawCard = useCallback(() => {
     const g = gameRef.current;
@@ -546,13 +551,17 @@ export default function GamePage() {
   }
 
   function handleTargetSelect(targetId: string) {
-    if (game?.pendingAction?.type === 'steal_target') {
+    const g = gameRef.current;
+    const selCards = selectedCards;
+    
+    if (g?.pendingAction?.type === 'steal_target') {
       sendAction({ type: 'steal_target', targetPlayerId: targetId });
       setSelectingTarget(false);
       sounds?.steal();
       return;
     }
-    const selectedCard = myPlayer?.hand.find(c => c.id === selectedCards[0]);
+    const myP = g?.players.find(p => p.id === playerId);
+    const selectedCard = myP?.hand.find(c => c.id === selCards[0]);
     if (selectedCard?.type === 'favor') {
       sendAction({ type: 'play_card', cardId: selectedCard.id, targetPlayerId: targetId });
       setSelectingTarget(false);
@@ -670,17 +679,27 @@ export default function GamePage() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full" />
+        <p className="text-text-muted text-sm">Loading game...</p>
       </div>
     );
   }
 
   if (!game) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center gap-4">
-        <p className="text-xl">Game not found</p>
-        <button onClick={() => router.push('/')} className="text-accent hover:underline">Go Home</button>
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 p-4">
+        <p className="text-4xl mb-2">😿</p>
+        <p className="text-xl text-center">Game not found</p>
+        <p className="text-text-muted text-sm text-center">This game may have expired or the link is incorrect.</p>
+        <div className="flex gap-3 mt-2">
+          <button onClick={() => fetchGame(playerId)} className="px-5 py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent transition-colors min-h-[44px]">
+            Retry
+          </button>
+          <button onClick={() => router.push('/')} className="px-5 py-3 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold min-h-[44px]">
+            Go Home
+          </button>
+        </div>
       </div>
     );
   }

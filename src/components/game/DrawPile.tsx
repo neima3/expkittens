@@ -14,7 +14,6 @@ export default memo(function DrawPile({ count, onClick, disabled, isMyTurn }: Dr
   return (
     <motion.button
       id="draw-pile-btn"
-      whileHover={!disabled && isMyTurn ? { scale: 1.05 } : undefined}
       whileTap={!disabled && isMyTurn ? { scale: 0.95 } : undefined}
       onClick={onClick}
       disabled={disabled || !isMyTurn}

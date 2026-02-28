@@ -67,7 +67,7 @@ export default function ThreeOfKindModal({ show, targets, onSelect, onCancel }: 
 
             {/* Step 2: Pick card type */}
             <p className="text-sm text-text-muted mb-2">2. Name a card to steal:</p>
-            <div className="grid grid-cols-2 gap-2 mb-6">
+            <div className="grid grid-cols-2 gap-2 mb-6 max-h-[40vh] overflow-y-auto scroll-touch">
               {STEALABLE_TYPES.map(type => {
                 const info = CARD_INFO[type];
                 return (
