@@ -15,8 +15,8 @@ export default function PlayerHand({ cards, selectedCards, onCardClick, disabled
   const sorted = [...cards].sort((a, b) => a.type.localeCompare(b.type));
 
   return (
-    <div className="w-full overflow-x-auto pb-2 bg-gradient-to-t from-surface-light/45 to-transparent rounded-t-xl">
-      <div className="flex gap-2 md:gap-3 justify-center min-w-min px-3 pt-2">
+    <div className="w-full overflow-x-auto pb-2 bg-gradient-to-t from-surface-light/45 to-transparent rounded-t-xl scroll-touch">
+      <div className="flex gap-2 md:gap-3 justify-center min-w-min px-3 pt-2 pb-1">
         <AnimatePresence mode="popLayout">
           {sorted.map((card, i) => (
             <GameCard

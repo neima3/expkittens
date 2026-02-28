@@ -88,16 +88,15 @@ export default function GameCard({
     <motion.button
       layout
       initial={{ opacity: 0, y: 20, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      animate={{ opacity: 1, y: selected ? -12 : 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.7, y: -30 }}
       transition={{ type: 'spring', stiffness: 350, damping: 28, delay: index * 0.03 }}
-      whileHover={!disabled ? { y: -10, scale: 1.08, zIndex: 10 } : undefined}
       whileTap={!disabled ? { scale: 0.93 } : undefined}
       onClick={!disabled ? onClick : undefined}
       disabled={disabled}
-      className={`${s.w} ${s.h} ${s.r} relative flex flex-col items-center justify-center border-2 transition-all shadow-lg flex-shrink-0 overflow-hidden
-        ${selected ? 'border-warning ring-2 ring-warning/50 -translate-y-3 z-10' : 'border-white/12'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-2xl'}
+      className={`${s.w} ${s.h} ${s.r} relative flex flex-col items-center justify-center border-2 transition-shadow shadow-lg flex-shrink-0 overflow-hidden
+        ${selected ? 'border-warning ring-2 ring-warning/50 z-10' : 'border-white/12'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:shadow-2xl'}
         ${glowPlayable && !disabled && !selected ? 'animate-pulse-glow' : ''}
       `}
       style={{

@@ -121,7 +121,7 @@ function HomeContent() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden">
+    <div className="min-h-dvh flex flex-col items-center justify-center p-4 md:p-6 relative overflow-x-hidden overflow-y-auto scroll-touch">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         {FLOATING_TOKENS.map(token => (
           <motion.div
@@ -237,11 +237,11 @@ function HomeContent() {
             )}
 
             <div className="mt-6 flex items-center justify-center gap-4 text-sm">
-              <button onClick={() => setShowStats(true)} className="text-text-muted hover:text-accent">
+              <button onClick={() => setShowStats(true)} className="text-text-muted active:text-accent py-2 px-1">
                 View Stats
               </button>
               <span className="text-border">•</span>
-              <Link href="/rules" className="text-text-muted hover:text-accent">
+              <Link href="/rules" className="text-text-muted active:text-accent py-2 px-1">
                 Rules
               </Link>
             </div>
@@ -256,7 +256,7 @@ function HomeContent() {
             exit={{ opacity: 0, y: -20 }}
             className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8"
           >
-            <button onClick={() => setScreen('home')} className="text-text-muted hover:text-text mb-5">
+            <button onClick={() => setScreen('home')} className="text-text-muted active:text-text mb-5 py-2 pr-4 min-h-[44px] flex items-center">
               ← Back
             </button>
 
@@ -357,7 +357,7 @@ function HomeContent() {
             exit={{ opacity: 0, y: -20 }}
             className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8"
           >
-            <button onClick={() => setScreen('home')} className="text-text-muted hover:text-text mb-5">
+            <button onClick={() => setScreen('home')} className="text-text-muted active:text-text mb-5 py-2 pr-4 min-h-[44px] flex items-center">
               ← Back
             </button>
 

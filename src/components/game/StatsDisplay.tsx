@@ -35,7 +35,7 @@ export default function StatsDisplay({ show, onClose }: StatsDisplayProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overscroll-contain"
           onClick={onClose}
         >
           <motion.div
@@ -43,7 +43,7 @@ export default function StatsDisplay({ show, onClose }: StatsDisplayProps) {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, y: 30 }}
             onClick={e => e.stopPropagation()}
-            className="glass-panel rounded-3xl p-6 max-w-sm w-full border-2 border-accent"
+            className="glass-panel rounded-3xl p-5 md:p-6 max-w-sm w-full border-2 border-accent max-h-[90vh] overflow-y-auto scroll-touch overscroll-contain"
           >
             <h3 className="display-font text-2xl mb-4 text-center bg-gradient-to-r from-accent to-warning bg-clip-text text-transparent">
               Your Stats
@@ -131,7 +131,7 @@ export default function StatsDisplay({ show, onClose }: StatsDisplayProps) {
 
             <button
               onClick={onClose}
-              className="w-full py-3 rounded-xl bg-surface-light border border-border text-text font-bold hover:border-accent transition-colors"
+              className="w-full py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent transition-colors min-h-[44px]"
             >
               Close
             </button>

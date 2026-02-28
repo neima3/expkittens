@@ -756,8 +756,8 @@ export default function GamePage() {
       {/* Winner modal */}
       <AnimatePresence>
         {showWinner && game.winnerId && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-8 text-center max-w-sm w-full border-2 border-warning shadow-2xl">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overscroll-contain">
+            <motion.div initial={{ scale: 0.5, y: 50 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-6 md:p-8 text-center max-w-sm w-full border-2 border-warning shadow-2xl max-h-[90vh] overflow-y-auto scroll-touch">
               <motion.div animate={{ rotate: [0, -10, 10, -10, 0] }} transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }} className="text-7xl mb-4">
                 {game.winnerId === playerId ? '🏆' : '💀'}
               </motion.div>
@@ -779,11 +779,10 @@ export default function GamePage() {
               )}
               <div className="flex flex-col gap-3">
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handleRematch}
                   disabled={rematchLoading}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold shadow-lg shadow-accent/20 disabled:opacity-50"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold shadow-lg shadow-accent/20 disabled:opacity-50 min-h-[44px]"
                 >
                   {rematchLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -794,24 +793,22 @@ export default function GamePage() {
                     game.isMultiplayer ? '🏠 Play Again' : '🔄 Rematch'
                   )}
                 </motion.button>
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => router.push('/')}
-                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold hover:border-accent/50 transition-colors"
+                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent/50 transition-colors min-h-[44px]"
                   >
                     🏠 Home
                   </motion.button>
                   <motion.button
-                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowStats(true)}
-                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold hover:border-accent/50 transition-colors"
+                    className="flex-1 py-3 rounded-xl bg-surface-light border border-border text-text font-bold active:border-accent/50 transition-colors min-h-[44px]"
                   >
                     📊 Stats
                   </motion.button>
-                  <button onClick={() => setShowWinner(false)} className="px-4 py-3 rounded-xl bg-surface-light border border-border text-text-muted font-bold hover:border-accent/50 transition-colors">
+                  <button onClick={() => setShowWinner(false)} className="px-4 py-3 rounded-xl bg-surface-light border border-border text-text-muted font-bold active:border-accent/50 transition-colors min-h-[44px]">
                     👁 Board
                   </button>
                 </div>
@@ -929,7 +926,7 @@ export default function GamePage() {
       />
 
       {/* Top bar */}
-      <div className="glass-panel border-x-0 border-t-0 rounded-none px-2 md:px-3 py-2 flex items-center gap-2">
+      <div className="glass-panel border-x-0 border-t-0 rounded-none px-2 md:px-3 py-2 safe-top safe-x flex items-center gap-2">
         <div className="hidden sm:flex flex-col items-start gap-1">
           <span className="status-pill py-1 text-[10px]">Room {game.code}</span>
           <button
@@ -937,12 +934,12 @@ export default function GamePage() {
               navigator.clipboard.writeText(game.code);
               toast.success('Code copied');
             }}
-            className="text-[11px] text-text-muted hover:text-accent"
+            className="text-[11px] text-text-muted active:text-accent min-h-[44px] flex items-center"
           >
             Copy code
           </button>
         </div>
-        <div className="flex-1 overflow-x-auto">
+        <div className="flex-1 overflow-x-auto scroll-touch">
           <OpponentBar
             players={game.players}
             currentPlayerId={currentPlayer?.id || ''}
@@ -951,7 +948,7 @@ export default function GamePage() {
             selectablePlayerIds={selectableTargets}
           />
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg border border-success/35 bg-success/10 min-w-[88px]">
             <span className="text-[10px] font-black text-success uppercase">Lv {levelInfo.level}</span>
             <div className="h-1 w-12 rounded-full bg-surface overflow-hidden">
@@ -960,7 +957,7 @@ export default function GamePage() {
           </div>
           <button
             onClick={() => setShowHotkeys(prev => !prev)}
-            className="w-8 h-8 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-xs hover:border-accent transition-colors"
+            className="w-10 h-10 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-xs active:border-accent transition-colors"
             title="Keyboard shortcuts"
             aria-label="Toggle keyboard shortcuts"
           >
@@ -999,7 +996,7 @@ export default function GamePage() {
       )}
 
       {/* Main game area */}
-      <div className="flex-1 flex flex-col items-center justify-start md:justify-center gap-2 md:gap-3 p-2 md:p-4 overflow-y-auto overflow-x-hidden relative game-bg table-aura">
+      <div className="flex-1 flex flex-col items-center justify-start md:justify-center gap-2 md:gap-3 p-2 md:p-4 overflow-y-auto overflow-x-hidden relative game-bg table-aura scroll-touch">
         {/* Floating emote */}
         <AnimatePresence>
           {floatingEmote && (
@@ -1104,7 +1101,7 @@ export default function GamePage() {
       </div>
 
       {/* Bottom bar: player info + hand */}
-      <div className="glass-panel border-x-0 border-b-0 rounded-none">
+      <div className="glass-panel border-x-0 border-b-0 rounded-none safe-x">
         {/* My info + actions */}
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
@@ -1113,7 +1110,7 @@ export default function GamePage() {
               <p className={`font-bold text-sm leading-none ${myPlayer && !myPlayer.isAlive ? 'line-through text-danger' : ''}`}>
                 {myPlayer?.name || 'You'}
               </p>
-              <p className="text-[10px] text-text-muted">
+              <p className="text-[11px] text-text-muted">
                 {myPlayer?.isAlive ? `${myPlayer?.hand.length} cards` : 'Eliminated'}
               </p>
             </div>
@@ -1124,7 +1121,7 @@ export default function GamePage() {
             {selectedCard && (
               <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-light/80 border border-border">
                 <span className="text-sm">{CARD_INFO[selectedCard.type].emoji}</span>
-                <span className="text-[10px] text-text-muted max-w-[80px] sm:max-w-[100px] truncate">{CARD_INFO[selectedCard.type].name}</span>
+                <span className="text-[11px] text-text-muted max-w-[80px] sm:max-w-[100px] truncate">{CARD_INFO[selectedCard.type].name}</span>
               </motion.div>
             )}
 
@@ -1133,21 +1130,20 @@ export default function GamePage() {
                 id="play-selected-btn"
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.93 }}
                 onClick={playSelected}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-sm shadow-lg shadow-accent/20 whitespace-nowrap"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-bold text-sm shadow-lg shadow-accent/20 whitespace-nowrap min-h-[44px]"
               >
                 {canPlayPair ? 'Steal (Pair)' : canPlayTriple ? 'Steal (Triple)' : `Play`}
               </motion.button>
             )}
             {selectedCards.length > 0 && (
-              <button onClick={() => setSelectedCards([])} className="px-2 py-2 rounded-lg bg-surface-light text-text-muted text-xs">✕</button>
+              <button onClick={() => setSelectedCards([])} className="w-10 h-10 rounded-lg bg-surface-light text-text-muted text-sm flex items-center justify-center">✕</button>
             )}
           </div>
         </div>
-        <div className="px-3 pb-2">
-          <p className="text-[10px] text-text-muted">
+        <div className="px-3 pb-1.5 hidden sm:block">
+          <p className="text-[11px] text-text-muted">
             Hotkeys: <span className="text-text">D</span> draw, <span className="text-text">Enter/P</span> play, <span className="text-text">L</span> log, <span className="text-text">?</span> help
           </p>
         </div>

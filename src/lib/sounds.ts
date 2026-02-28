@@ -14,7 +14,9 @@ class SoundManager {
 
   private getCtx(): AudioContext {
     if (!this.ctx) {
-      this.ctx = new AudioContext();
+      // Safari fallback: webkitAudioContext for older iOS Safari versions
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.ctx = new AudioCtx();
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();

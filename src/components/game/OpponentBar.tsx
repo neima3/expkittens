@@ -23,7 +23,7 @@ export default function OpponentBar({
   const opponents = players.filter(p => p.id !== myId);
 
   return (
-    <div className="flex gap-2 md:gap-3 overflow-x-auto px-2 py-1">
+    <div className="flex gap-2 md:gap-3 overflow-x-auto px-2 py-1 scroll-touch">
       {opponents.map(player => {
         const isCurrent = player.id === currentPlayerId;
         const isSelectable = selectablePlayerIds?.includes(player.id);
@@ -31,13 +31,12 @@ export default function OpponentBar({
         return (
           <motion.button
             key={player.id}
-            whileHover={isSelectable ? { scale: 1.05 } : undefined}
             whileTap={isSelectable ? { scale: 0.95 } : undefined}
             onClick={() => isSelectable && onPlayerClick?.(player.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all min-w-fit
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 transition-all min-w-fit min-h-[44px]
               ${!player.isAlive ? 'opacity-45 border-danger/35 bg-danger/10' : ''}
               ${isCurrent && player.isAlive ? 'border-accent bg-accent/16 animate-pulse-glow' : 'border-border bg-surface-light/80'}
-              ${isSelectable ? 'cursor-pointer border-warning hover:border-accent' : 'cursor-default'}
+              ${isSelectable ? 'cursor-pointer border-warning active:border-accent' : 'cursor-default'}
             `}
             disabled={!isSelectable}
           >

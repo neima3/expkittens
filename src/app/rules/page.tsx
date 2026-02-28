@@ -13,10 +13,10 @@ const cardOrder: CardType[] = [
 
 export default function RulesPage() {
   return (
-    <div className="min-h-dvh p-4 md:p-8 max-w-2xl mx-auto">
+    <div className="min-h-dvh p-4 md:p-8 max-w-2xl mx-auto overflow-y-auto scroll-touch">
       <Link
         href="/"
-        className="text-text-muted hover:text-text mb-6 inline-flex items-center gap-2"
+        className="text-text-muted active:text-text mb-6 inline-flex items-center gap-2 py-2 min-h-[44px]"
       >
         ← Back to Home
       </Link>

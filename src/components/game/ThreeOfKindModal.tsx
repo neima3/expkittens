@@ -37,12 +37,12 @@ export default function ThreeOfKindModal({ show, targets, onSelect, onCancel }: 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4 overscroll-contain"
         >
           <motion.div
             initial={{ scale: 0.8, y: 30 }}
             animate={{ scale: 1, y: 0 }}
-            className="bg-surface rounded-3xl p-6 max-w-sm w-full border-2 border-warning max-h-[80vh] overflow-y-auto"
+            className="bg-surface rounded-3xl p-5 md:p-6 max-w-sm w-full border-2 border-warning max-h-[85vh] overflow-y-auto scroll-touch overscroll-contain"
           >
             <h3 className="text-xl font-bold mb-4 text-center">Three of a Kind!</h3>
 
@@ -53,10 +53,10 @@ export default function ThreeOfKindModal({ show, targets, onSelect, onCancel }: 
                 <button
                   key={t.id}
                   onClick={() => setSelectedTarget(t.id)}
-                  className={`w-full p-3 rounded-xl text-left transition-all ${
+                  className={`w-full p-3 rounded-xl text-left transition-all min-h-[44px] ${
                     selectedTarget === t.id
                       ? 'bg-warning/20 border-2 border-warning'
-                      : 'bg-surface-light border-2 border-transparent hover:border-border'
+                      : 'bg-surface-light border-2 border-transparent active:border-border'
                   }`}
                 >
                   <span className="font-bold">{t.name}</span>
@@ -74,10 +74,10 @@ export default function ThreeOfKindModal({ show, targets, onSelect, onCancel }: 
                   <button
                     key={type}
                     onClick={() => setSelectedType(type)}
-                    className={`p-2 rounded-xl text-center text-sm transition-all ${
+                    className={`p-2.5 rounded-xl text-center text-sm transition-all min-h-[44px] ${
                       selectedType === type
                         ? 'border-2 border-warning'
-                        : 'border-2 border-transparent bg-surface-light hover:border-border'
+                        : 'border-2 border-transparent bg-surface-light active:border-border'
                     }`}
                     style={selectedType === type ? { background: `${info.color}22` } : undefined}
                   >
@@ -93,16 +93,15 @@ export default function ThreeOfKindModal({ show, targets, onSelect, onCancel }: 
             <div className="flex gap-2">
               <button
                 onClick={onCancel}
-                className="flex-1 py-3 rounded-xl bg-surface-light text-text-muted font-bold"
+                className="flex-1 py-3 rounded-xl bg-surface-light text-text-muted font-bold min-h-[44px]"
               >
                 Cancel
               </button>
               <motion.button
-                whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={handleConfirm}
                 disabled={!selectedTarget || !selectedType}
-                className="flex-1 py-3 rounded-xl bg-warning text-black font-bold disabled:opacity-30"
+                className="flex-1 py-3 rounded-xl bg-warning text-black font-bold disabled:opacity-30 min-h-[44px]"
               >
                 Steal!
               </motion.button>
