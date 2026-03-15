@@ -8,8 +8,7 @@ import { Suspense } from 'react';
 import { toast } from 'sonner';
 import StatsDisplay from '@/components/game/StatsDisplay';
 import { getStats, getRankInfo, getAchievements, getLevelInfo } from '@/lib/stats';
-
-const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
+import { AVATARS } from '@/types/game';
 
 const FLOATING_TOKENS = [
   { symbol: '💣', top: '10%', left: '8%', delay: 0, duration: 15 },

@@ -5,8 +5,6 @@ import type {
   GameState,
   GameAction,
   Player,
-  PendingAction,
-  CAT_CARD_TYPES,
 } from '@/types/game';
 
 function shuffle<T>(array: T[]): T[] {
@@ -108,7 +106,7 @@ export function createGame(options: {
   const game: GameState = {
     id: nanoid(12),
     code,
-    status: options.isMultiplayer ? 'waiting' : 'waiting',
+    status: 'waiting',
     players,
     deck: [],
     discardPile: [],
@@ -276,11 +274,11 @@ export function processAction(game: GameState, action: GameAction): GameState {
           break;
         }
         case 'nope': {
-          // Nope is handled specially - it cancels the pending action
-          state.logs.push({ message: `${player.name} played Nope!`, timestamp: Date.now(), playerId: player.id });
-          if (state.pendingAction) {
-            state.pendingAction = null;
+          if (!state.pendingAction) {
+            throw new Error('Nothing to Nope — play Nope when an action is pending');
           }
+          state.logs.push({ message: `${player.name} played Nope!`, timestamp: Date.now(), playerId: player.id });
+          state.pendingAction = null;
           break;
         }
         default:

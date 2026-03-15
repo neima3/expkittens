@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createGame, startGame } from '@/lib/game-engine';
-import { saveGame, initializeDatabase } from '@/lib/db';
-import { processAITurn } from '@/lib/ai';
+import { saveGame, initializeDatabase, maybeCleanupOldGames } from '@/lib/db';
 import { nanoid } from 'nanoid';
 
 export async function POST(req: NextRequest) {
   try {
     await initializeDatabase();
+    void maybeCleanupOldGames();
 
     const body = await req.json();
     const { playerName, avatar = 0, mode, aiCount = 1 } = body;
 
-    if (!playerName || typeof playerName !== 'string') {
+    if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
     }
 

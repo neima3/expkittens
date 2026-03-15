@@ -22,8 +22,7 @@ import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
 import type { ProgressUpdate } from '@/lib/stats';
-
-const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
+import { AVATARS } from '@/types/game';
 
 function isCatCard(type: CardType): boolean {
   return CAT_CARD_TYPES.includes(type);
@@ -1123,7 +1122,7 @@ export default function GamePage() {
                 </span>
               )}
             </motion.div>
-            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} />
+            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} />
           </div>
 
           {/* Desktop Turn Indicator */}
@@ -1219,7 +1218,7 @@ export default function GamePage() {
         {/* RIGHT SIDEBAR (Desktop) */}
         <div className="hidden lg:flex flex-col gap-4 p-5 border-l border-white/5 bg-black/20 overflow-y-auto">
           <div className="glass-panel p-5 rounded-2xl flex flex-col gap-5">
-            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} />
+            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} />
           </div>
           
           <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3 relative overflow-hidden">

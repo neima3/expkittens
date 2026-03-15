@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { code, playerName, avatar = 0 } = body;
 
-    if (!code || !playerName) {
+    if (!code || !playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Code and player name required' }, { status: 400 });
     }
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     const playerId = nanoid(12);
     game.players.push({
       id: playerId,
-      name: playerName.slice(0, 20),
+      name: playerName.trim().slice(0, 20),
       hand: [],
       isAlive: true,
       isAI: false,

@@ -94,11 +94,17 @@ export function getAIAction(game: GameState, aiPlayer: Player): GameAction | nul
       const targets = game.players.filter(p => p.isAlive && p.id !== aiPlayer.id && p.hand.length > 0);
       if (targets.length > 0) {
         const target = targets.reduce((a, b) => a.hand.length > b.hand.length ? a : b);
+        // Prioritize defuse, then high-value cards, with some randomization
+        const hasDefuse = hand.some(c => c.type === 'defuse');
+        const stealPriority: CardType[] = hasDefuse
+          ? ['attack', 'see_the_future', 'skip', 'nope', 'shuffle', 'defuse']
+          : ['defuse', 'attack', 'see_the_future', 'skip', 'nope', 'shuffle'];
+        const targetCardType = stealPriority[Math.floor(Math.random() * Math.min(3, stealPriority.length))];
         return {
           type: 'three_of_kind_target',
           playerId: aiPlayer.id,
           targetPlayerId: target.id,
-          targetCardType: 'defuse',
+          targetCardType,
         };
       }
     }

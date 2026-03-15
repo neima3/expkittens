@@ -6,33 +6,33 @@ import { motion } from 'framer-motion';
 interface DangerMeterProps {
   deckSize: number;
   alivePlayers: number;
+  defuseCount?: number;
 }
 
-export default memo(function DangerMeter({ deckSize, alivePlayers }: DangerMeterProps) {
+export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount = 0 }: DangerMeterProps) {
   const ekRemaining = Math.max(0, alivePlayers - 1);
   const danger = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
   const percent = Math.round(danger * 100);
+  const shielded = defuseCount > 0;
 
   let color = '#2bd47c'; // success
   let glow = 'rgba(43,212,124,0)';
-  let label = 'Safe';
-  let pulse = false;
+  let label = shielded ? 'Shielded' : 'Safe';
 
-  if (danger > 0.5) { 
-    color = '#ff3355'; // danger
-    glow = 'rgba(255,51,85,0.6)';
-    label = 'Extreme'; 
-    pulse = true;
+  if (danger > 0.5) {
+    color = shielded ? '#ffb833' : '#ff3355';
+    glow = shielded ? 'rgba(255,184,51,0.4)' : 'rgba(255,51,85,0.6)';
+    label = shielded ? 'Risky' : 'Extreme';
   }
-  else if (danger > 0.3) { 
-    color = '#ff5f2e'; // accent
-    glow = 'rgba(255,95,46,0.4)';
-    label = 'High'; 
+  else if (danger > 0.3) {
+    color = shielded ? '#ffb833' : '#ff5f2e';
+    glow = shielded ? 'rgba(255,184,51,0.2)' : 'rgba(255,95,46,0.4)';
+    label = shielded ? 'Caution' : 'High';
   }
-  else if (danger > 0.15) { 
+  else if (danger > 0.15) {
     color = '#ffb833'; // warning
     glow = 'rgba(255,184,51,0.2)';
-    label = 'Medium'; 
+    label = shielded ? 'Guarded' : 'Medium';
   }
 
   return (
@@ -69,6 +69,11 @@ export default memo(function DangerMeter({ deckSize, alivePlayers }: DangerMeter
       <span className="font-black text-white/90 min-w-[28px] text-right text-[10px] tracking-wider">
         {percent}%
       </span>
+      {shielded && (
+        <span className="text-success text-[9px] font-bold" title={`${defuseCount} Defuse card${defuseCount > 1 ? 's' : ''}`}>
+          🛡️
+        </span>
+      )}
     </div>
   );
 })

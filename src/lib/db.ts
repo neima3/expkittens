@@ -6,7 +6,10 @@ function getDb() {
   return sql;
 }
 
+let dbInitialized = false;
+
 export async function initializeDatabase() {
+  if (dbInitialized) return;
   const sql = getDb();
   await sql`
     CREATE TABLE IF NOT EXISTS ek_games (
@@ -19,6 +22,7 @@ export async function initializeDatabase() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS ek_games_code_idx ON ek_games(code)`;
   await sql`CREATE INDEX IF NOT EXISTS ek_games_updated_idx ON ek_games(updated_at)`;
+  dbInitialized = true;
 }
 
 export async function saveGame(game: GameState): Promise<void> {
@@ -48,6 +52,19 @@ export async function getGameByCode(code: string): Promise<GameState | null> {
 
 export async function deleteOldGames(): Promise<void> {
   const sql = getDb();
-  // Delete games older than 24 hours
   await sql`DELETE FROM ek_games WHERE updated_at < NOW() - INTERVAL '24 hours'`;
+}
+
+let lastCleanup = 0;
+const CLEANUP_INTERVAL = 1000 * 60 * 60; // 1 hour
+
+export async function maybeCleanupOldGames(): Promise<void> {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  try {
+    await deleteOldGames();
+  } catch {
+    // Non-critical — swallow cleanup errors
+  }
 }

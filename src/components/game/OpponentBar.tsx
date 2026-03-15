@@ -2,9 +2,8 @@
 
 import { memo } from 'react';
 import { motion } from 'framer-motion';
+import { AVATARS } from '@/types/game';
 import type { Player } from '@/types/game';
-
-const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'];
 
 interface OpponentBarProps {
   players: Player[];
@@ -64,7 +63,7 @@ export default memo(function OpponentBar({
                 {player.isAlive ? (
                   <>
                     <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest bg-black/40 px-1.5 py-0.5 rounded text-white/70">
-                      {player.hand.length} <span className="opacity-50">CRDS</span>
+                      {player.hand.length} <span className="opacity-50">CARDS</span>
                     </span>
                   </>
                 ) : (
