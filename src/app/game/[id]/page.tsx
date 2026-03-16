@@ -124,6 +124,8 @@ export default function GamePage() {
   const [seeFutureCards, setSeeFutureCards] = useState<Card[]>([]);
   const [showDefuseModal, setShowDefuseModal] = useState(false);
   const [defusePosition, setDefusePosition] = useState(0);
+  const [defuseCountdown, setDefuseCountdown] = useState(10);
+  const defuseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [selectingTarget, setSelectingTarget] = useState(false);
   const [selectingThreeTarget, setSelectingThreeTarget] = useState(false);
   const [showExplosion, setShowExplosion] = useState(false);
@@ -203,6 +205,29 @@ export default function GamePage() {
       return update.level;
     });
   }, []);
+
+  // Defuse countdown timer — 10s, auto-submits random on expiry
+  const [defuseTimedOut, setDefuseTimedOut] = useState(false);
+  useEffect(() => {
+    if (!showDefuseModal) {
+      if (defuseTimerRef.current) { clearInterval(defuseTimerRef.current); defuseTimerRef.current = null; }
+      setDefuseTimedOut(false);
+      return;
+    }
+    setDefuseCountdown(10);
+    setDefuseTimedOut(false);
+    const start = Date.now();
+    defuseTimerRef.current = setInterval(() => {
+      const elapsed = (Date.now() - start) / 1000;
+      const remaining = Math.max(0, 10 - elapsed);
+      setDefuseCountdown(remaining);
+      if (remaining <= 0) {
+        if (defuseTimerRef.current) clearInterval(defuseTimerRef.current);
+        setDefuseTimedOut(true);
+      }
+    }, 100);
+    return () => { if (defuseTimerRef.current) clearInterval(defuseTimerRef.current); };
+  }, [showDefuseModal]);
 
   const fetchGame = useCallback(async (pid?: string) => {
     try {
@@ -557,6 +582,17 @@ export default function GamePage() {
       setActionLoading(false);
     }
   }
+
+  // Handle defuse timeout auto-submit
+  useEffect(() => {
+    if (!defuseTimedOut || !showDefuseModal) return;
+    const g = gameRef.current;
+    const randomPos = g ? Math.floor(Math.random() * (g.deck.length + 1)) : 0;
+    setShowDefuseModal(false);
+    setDefusePosition(0);
+    sendAction({ type: 'defuse_place', position: randomPos });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defuseTimedOut]);
 
   const handleCardClick = useCallback((card: Card) => {
     const g = gameRef.current;
@@ -1103,32 +1139,99 @@ export default function GamePage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showDefuseModal && (
+        {showDefuseModal && game && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-6 text-center max-w-sm w-full border-2 border-success">
-              <p className="text-4xl mb-2">🔧💣</p>
-              <h3 className="text-xl font-bold mb-2">Defused!</h3>
-              <p className="text-sm text-text-muted mb-1">Place the Exploding Kitten back in the deck.</p>
-              <p className="text-xs text-text-muted mb-4">Top = next person draws it. Bottom = buried deep.</p>
-
-              <div className="flex items-center justify-center gap-1 mb-3 h-8">
-                {Array.from({ length: Math.min(game.deck.length + 1, 20) }).map((_, i) => {
-                  const pos = Math.round((i / Math.min(game.deck.length, 19)) * game.deck.length);
-                  return (
-                    <div
-                      key={i}
-                      className={`w-1.5 rounded-full transition-all ${pos === defusePosition ? 'bg-danger h-8' : 'bg-border h-4'}`}
-                    />
-                  );
-                })}
+            <motion.div initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-6 text-center max-w-sm w-full border-2 border-success relative overflow-hidden">
+              {/* Countdown ring */}
+              <div className="absolute top-3 right-3 w-10 h-10">
+                <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                  <circle cx="18" cy="18" r="15.5" fill="none"
+                    stroke={defuseCountdown <= 3 ? '#ff3355' : '#2bd47c'}
+                    strokeWidth="2.5" strokeLinecap="round"
+                    strokeDasharray={`${(defuseCountdown / 10) * 97.4} 97.4`}
+                    className="transition-all duration-100"
+                  />
+                </svg>
+                <span className={`absolute inset-0 flex items-center justify-center text-xs font-bold ${defuseCountdown <= 3 ? 'text-danger' : 'text-text'}`}>
+                  {Math.ceil(defuseCountdown)}
+                </span>
               </div>
 
-              <input type="range" min={0} max={game.deck.length} value={defusePosition} onChange={e => setDefusePosition(Number(e.target.value))} className="w-full mb-2 accent-success" />
+              <p className="text-4xl mb-2">🔧💣</p>
+              <h3 className="text-xl font-bold mb-1">Defused!</h3>
+              <p className="text-sm text-text-muted mb-4">Place the Exploding Kitten back in the deck.</p>
+
+              {/* Quick-pick buttons */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => setDefusePosition(0)}
+                  className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all ${defusePosition === 0 ? 'bg-danger text-white ring-2 ring-danger/50' : 'bg-surface-light text-text-muted hover:bg-danger/20 hover:text-danger'}`}>
+                  Top
+                  <span className="block text-[10px] font-normal opacity-70">Evil!</span>
+                </button>
+                <button onClick={() => { const randomPos = Math.floor(Math.random() * (game.deck.length + 1)); setDefusePosition(randomPos); }}
+                  className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all bg-surface-light text-text-muted hover:bg-warning/20 hover:text-warning`}>
+                  Random
+                  <span className="block text-[10px] font-normal opacity-70">Chaos</span>
+                </button>
+                <button onClick={() => setDefusePosition(game.deck.length)}
+                  className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all ${defusePosition === game.deck.length ? 'bg-success text-white ring-2 ring-success/50' : 'bg-surface-light text-text-muted hover:bg-success/20 hover:text-success'}`}>
+                  Bottom
+                  <span className="block text-[10px] font-normal opacity-70">Safe</span>
+                </button>
+              </div>
+
+              {/* Visual deck preview */}
+              <div className="relative mb-3 px-2">
+                <div className="flex items-end justify-center gap-[2px] h-16">
+                  {(() => {
+                    const deckLen = game.deck.length;
+                    const maxSlots = Math.min(deckLen + 1, 24);
+                    return Array.from({ length: maxSlots }).map((_, i) => {
+                      const pos = maxSlots <= deckLen + 1 ? i : Math.round((i / (maxSlots - 1)) * deckLen);
+                      const isInsertPoint = pos === defusePosition;
+                      const isNearInsert = Math.abs(pos - defusePosition) <= 1;
+                      return (
+                        <button key={i} onClick={() => setDefusePosition(pos)}
+                          className={`rounded-sm transition-all cursor-pointer ${
+                            isInsertPoint
+                              ? 'bg-danger w-2.5 h-14 shadow-[0_0_12px_rgba(255,51,85,0.6)] animate-pulse'
+                              : isNearInsert
+                                ? 'bg-warning/60 w-1.5 h-10'
+                                : 'bg-border/60 w-1 h-6 hover:bg-border hover:h-8'
+                          }`}
+                        />
+                      );
+                    });
+                  })()}
+                </div>
+                <div className="flex justify-between text-[10px] text-text-muted mt-1 px-1">
+                  <span>Top</span>
+                  <span>Bottom</span>
+                </div>
+              </div>
+
+              {/* Slider for precise control */}
+              <input type="range" min={0} max={game.deck.length} value={defusePosition}
+                onChange={e => setDefusePosition(Number(e.target.value))}
+                className="w-full mb-2 accent-success" />
               <p className="text-sm text-text-muted mb-4">
                 Position: <span className="font-bold text-success">{defusePosition}</span> of {game.deck.length}
-                {defusePosition <= 1 ? <span className="text-danger ml-1">(Evil!)</span> : defusePosition >= game.deck.length - 1 ? <span className="text-success ml-1">(Safe for now)</span> : ''}
+                {defusePosition === 0 ? <span className="text-danger ml-1">(Next player draws it!)</span>
+                  : defusePosition <= 2 ? <span className="text-danger ml-1">(Evil!)</span>
+                  : defusePosition >= game.deck.length ? <span className="text-success ml-1">(Buried deep)</span>
+                  : defusePosition >= game.deck.length - 2 ? <span className="text-success ml-1">(Safe for now)</span>
+                  : ''}
               </p>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { setShowDefuseModal(false); sendAction({ type: 'defuse_place', position: defusePosition }); setDefusePosition(0); }} className="w-full py-3 rounded-xl bg-success text-white font-bold">
+
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (defuseTimerRef.current) clearInterval(defuseTimerRef.current);
+                  setShowDefuseModal(false);
+                  sendAction({ type: 'defuse_place', position: defusePosition });
+                  setDefusePosition(0);
+                }}
+                className="w-full py-3 rounded-xl bg-success text-white font-bold text-base">
                 Place It!
               </motion.button>
             </motion.div>

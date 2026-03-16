@@ -10,6 +10,16 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function getNextAliveIndex(game: GameState, currentPlayerId: string): number {
+  const players = game.players;
+  const currentIdx = players.findIndex(p => p.id === currentPlayerId);
+  for (let i = 1; i < players.length; i++) {
+    const idx = (currentIdx + i) % players.length;
+    if (players[idx].isAlive) return idx;
+  }
+  return -1;
+}
+
 function getCardPriority(type: CardType): number {
   switch (type) {
     case 'defuse': return 0; // never play voluntarily
@@ -62,8 +72,28 @@ export function getAIAction(game: GameState, aiPlayer: Player): GameAction | nul
     }
 
     if (game.pendingAction.type === 'defuse_place' && game.pendingAction.playerId === aiPlayer.id) {
-      // Place near top to trap next player, but not position 0 (too obvious)
-      const position = Math.min(1 + Math.floor(Math.random() * 3), game.deck.length);
+      // Strategic placement based on game context
+      const deckSize = game.deck.length;
+      const alivePlayers = game.players.filter(p => p.isAlive);
+      const nextIdx = getNextAliveIndex(game, aiPlayer.id);
+      const nextPlayer = nextIdx !== -1 ? alivePlayers[nextIdx] : null;
+      // If next player likely has no defuse (small hand), place near top to eliminate them
+      // If we're one of few survivors, play aggressively near top
+      // Otherwise spread placement to be less predictable
+      let position: number;
+      if (alivePlayers.length <= 2) {
+        // Heads-up: always place near top to trap opponent
+        position = Math.min(Math.floor(Math.random() * 2), deckSize);
+      } else if (nextPlayer && nextPlayer.hand.length <= 2) {
+        // Next player has few cards, likely no defuse — trap them
+        position = Math.min(1 + Math.floor(Math.random() * 2), deckSize);
+      } else if (deckSize <= 4) {
+        // Small deck, anywhere is dangerous — place randomly near top
+        position = Math.min(Math.floor(Math.random() * 2), deckSize);
+      } else {
+        // Normal play: positions 1-4, weighted toward top but not position 0
+        position = Math.min(1 + Math.floor(Math.random() * 4), deckSize);
+      }
       return {
         type: 'defuse_place',
         playerId: aiPlayer.id,
