@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
-import { processAction, getPlayerView } from '@/lib/game-engine';
-import { processAITurn } from '@/lib/ai';
+import { processAction, resolveNopeWindow, getPlayerView } from '@/lib/game-engine';
+import { processAITurn, processAINopeResponses } from '@/lib/ai';
 import type { GameAction } from '@/types/game';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,30 +22,46 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let updatedGame = processAction(game, action);
 
+    // If a nope window just opened, let AI players respond
+    if (updatedGame.pendingAction?.type === 'nope_window') {
+      updatedGame = await processAINopeResponses(updatedGame);
+    }
+
     // Process AI turns and pending actions
-    let maxIterations = 20; // Safety guard against infinite loops
+    let maxIterations = 20;
     let aiProcessed = true;
     while (aiProcessed && updatedGame.status === 'playing' && maxIterations-- > 0) {
       const prevActionId = updatedGame.lastActionId;
       const currentPlayer = updatedGame.players[updatedGame.currentPlayerIndex];
 
       if (updatedGame.pendingAction) {
-        // Handle pending actions (favor_give, defuse_place, etc.) for AI players
-        const pendingPlayer = updatedGame.players.find(p => p.id === updatedGame.pendingAction!.playerId);
-        if (pendingPlayer?.isAI) {
-          const result = await processAITurn(updatedGame);
-          updatedGame = result.game;
-        } else {
+        if (updatedGame.pendingAction.type === 'nope_window') {
+          // Nope window is active — don't process AI turns, wait for resolution
           aiProcessed = false;
+        } else {
+          const pendingPlayer = updatedGame.players.find(p => p.id === updatedGame.pendingAction!.playerId);
+          if (pendingPlayer?.isAI) {
+            const result = await processAITurn(updatedGame);
+            updatedGame = result.game;
+            // Check for new nope window after AI turn
+            if (updatedGame.pendingAction?.type === 'nope_window') {
+              updatedGame = await processAINopeResponses(updatedGame);
+            }
+          } else {
+            aiProcessed = false;
+          }
         }
       } else if (currentPlayer.isAI && currentPlayer.isAlive) {
         const result = await processAITurn(updatedGame);
         updatedGame = result.game;
+        // Check for new nope window after AI turn
+        if (updatedGame.pendingAction?.type === 'nope_window') {
+          updatedGame = await processAINopeResponses(updatedGame);
+        }
       } else {
         aiProcessed = false;
       }
 
-      // If no progress was made, break to prevent infinite loop
       if (updatedGame.lastActionId === prevActionId && aiProcessed) {
         break;
       }

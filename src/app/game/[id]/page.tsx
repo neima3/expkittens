@@ -1246,6 +1246,112 @@ export default function GamePage() {
         onCancel={() => setSelectingThreeTarget(false)}
       />
 
+      {/* NOPE WINDOW */}
+      <AnimatePresence>
+        {game.pendingAction?.type === 'nope_window' && game.pendingAction.expiresAt && (() => {
+          const pa = game.pendingAction!;
+          const nopeChain = pa.nopeChain || [];
+          const cardPlayed = pa.cardPlayed || 'nope';
+          const sourcePlayer = game.players.find(p => p.id === pa.sourcePlayerId);
+          const myNopeCards = myPlayer?.hand.filter(c => c.type === 'nope') || [];
+          const canNope = myNopeCards.length > 0 && pa.sourcePlayerId !== playerId;
+          const timeLeft = Math.max(0, (pa.expiresAt! - Date.now()) / 1000);
+
+          return (
+            <motion.div
+              key="nope-window"
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md"
+            >
+              <div className="bg-surface/95 backdrop-blur-xl border-2 border-[#888] rounded-2xl p-4 shadow-[0_0_30px_rgba(136,136,136,0.3)]">
+                {/* Timer bar */}
+                <div className="w-full h-1.5 rounded-full bg-border/50 mb-3 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full"
+                    style={{ background: timeLeft <= 2 ? '#ff3355' : '#888888' }}
+                    initial={{ width: '100%' }}
+                    animate={{ width: `${(timeLeft / 5) * 100}%` }}
+                    transition={{ duration: 0.1 }}
+                  />
+                </div>
+
+                {/* Header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">✋</span>
+                  <div className="text-left flex-1">
+                    <p className="text-sm font-bold">
+                      {sourcePlayer?.name} played {CARD_INFO[cardPlayed]?.emoji} {CARD_INFO[cardPlayed]?.name}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {nopeChain.length === 0 ? 'Anyone can Nope!' : `${nopeChain.length} Nope${nopeChain.length > 1 ? 's' : ''} in chain`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Nope chain visualization */}
+                {nopeChain.length > 0 && (
+                  <div className="flex items-center gap-1 mb-3 overflow-x-auto pb-1">
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="px-2 py-1 rounded-lg bg-surface-light text-text-muted">
+                        {CARD_INFO[cardPlayed]?.emoji} {CARD_INFO[cardPlayed]?.name}
+                      </span>
+                      {nopeChain.map((noperId, i) => {
+                        const noper = game.players.find(p => p.id === noperId);
+                        return (
+                          <span key={i} className="flex items-center gap-1">
+                            <span className="text-text-muted">&gt;</span>
+                            <span className={`px-2 py-1 rounded-lg font-bold ${i % 2 === 0 ? 'bg-danger/20 text-danger' : 'bg-success/20 text-success'}`}>
+                              ✋ {noper?.name}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Result preview */}
+                <p className="text-xs text-center mb-3">
+                  {nopeChain.length % 2 === 0
+                    ? <span className="text-success">Action will proceed</span>
+                    : <span className="text-danger">Action is cancelled</span>
+                  }
+                </p>
+
+                {/* Action buttons */}
+                {canNope ? (
+                  <div className="flex gap-2">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => {
+                        const nopeCard = myNopeCards[0];
+                        sendAction({ type: 'play_card', cardId: nopeCard.id });
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-[#888] text-white font-bold text-sm animate-pulse"
+                    >
+                      NOPE! ({myNopeCards.length})
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => sendAction({ type: 'nope_pass' })}
+                      className="flex-1 py-2.5 rounded-xl bg-surface-light text-text-muted font-bold text-sm"
+                    >
+                      Pass
+                    </motion.button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted text-center">
+                    {pa.sourcePlayerId === playerId ? 'Waiting for other players...' : 'You have no Nope cards'}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
+
       {/* MOBILE TOP BAR */}
       <div className="lg:hidden glass-panel border-x-0 border-t-0 rounded-none px-2 md:px-3 py-2 safe-top safe-x flex items-center gap-2 z-30">
         <div className="hidden sm:flex flex-col items-start gap-1">

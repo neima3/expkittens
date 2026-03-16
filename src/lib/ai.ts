@@ -1,6 +1,6 @@
 import type { GameState, GameAction, CardType, Player, Card } from '@/types/game';
 import { CAT_CARD_TYPES } from '@/types/game';
-import { processAction } from './game-engine';
+import { processAction, resolveNopeWindow } from './game-engine';
 
 function isCatCard(type: CardType): boolean {
   return CAT_CARD_TYPES.includes(type);
@@ -288,4 +288,90 @@ export async function processAITurn(game: GameState): Promise<{ game: GameState;
   }
 
   return { game: state, actions };
+}
+
+// AI Nope probability by card type being contested
+function getAINopeChance(cardPlayed: CardType, game: GameState, aiPlayer: Player): number {
+  const hasDefuse = aiPlayer.hand.some(c => c.type === 'defuse');
+  const nopeCount = aiPlayer.hand.filter(c => c.type === 'nope').length;
+  const alivePlayers = game.players.filter(p => p.isAlive).length;
+
+  // Base probability by card type
+  let chance = 0;
+  switch (cardPlayed) {
+    case 'attack': chance = hasDefuse ? 0.2 : 0.6; break;  // Higher if we have no defuse
+    case 'favor': chance = 0.5; break;                       // Favor targeting us is bad
+    case 'skip': chance = 0.1; break;                        // Skip is harmless to us
+    case 'shuffle': chance = 0.15; break;                    // Shuffle is usually neutral
+    case 'see_the_future': chance = 0.05; break;             // Low value to nope
+    default: chance = 0.15;
+  }
+
+  // Save nopes if we only have one and there are many players
+  if (nopeCount <= 1 && alivePlayers > 2) {
+    chance *= 0.5;
+  }
+
+  return chance;
+}
+
+/**
+ * Process AI Nope responses during a nope_window.
+ * Each AI with Nope cards decides whether to play Nope or pass.
+ * If all AI pass (and no human has Nope), resolve immediately.
+ */
+export async function processAINopeResponses(game: GameState): Promise<GameState> {
+  let state = game;
+  if (!state.pendingAction || state.pendingAction.type !== 'nope_window') return state;
+
+  const cardPlayed = state.pendingAction.cardPlayed!;
+  const sourcePlayerId = state.pendingAction.sourcePlayerId!;
+
+  // Get AI players who could play Nope (not the one who played the card, alive, have Nope)
+  const aiWithNope = state.players.filter(p =>
+    p.isAI && p.isAlive && p.id !== sourcePlayerId && p.hand.some(c => c.type === 'nope')
+  );
+
+  for (const aiPlayer of aiWithNope) {
+    if (!state.pendingAction || state.pendingAction.type !== 'nope_window') break;
+
+    // Check if this AI already played a Nope in this chain (the last noper)
+    const lastNoper = state.pendingAction.nopeChain?.[state.pendingAction.nopeChain.length - 1];
+    if (lastNoper === aiPlayer.id) continue;
+
+    await delay(300 + Math.random() * 500);
+
+    const chance = getAINopeChance(cardPlayed, state, aiPlayer);
+    if (Math.random() < chance) {
+      // Play Nope
+      const nopeCard = aiPlayer.hand.find(c => c.type === 'nope');
+      if (nopeCard) {
+        const nopeAction: GameAction = { type: 'play_card', playerId: aiPlayer.id, cardId: nopeCard.id };
+        state = processAction(state, nopeAction);
+
+        // If a nope window is still open (counter-nope chain), let other AIs respond
+        if (state.pendingAction?.type === 'nope_window') {
+          // Recursive: other AIs may counter-nope
+          state = await processAINopeResponses(state);
+        }
+        return state;
+      }
+    } else {
+      // Pass
+      const passAction: GameAction = { type: 'nope_pass', playerId: aiPlayer.id };
+      state = processAction(state, passAction);
+    }
+  }
+
+  // If no human players have Nope cards and all AI passed, resolve immediately
+  if (state.pendingAction?.type === 'nope_window') {
+    const humanWithNope = state.players.filter(p =>
+      !p.isAI && p.isAlive && p.id !== sourcePlayerId && p.hand.some(c => c.type === 'nope')
+    );
+    if (humanWithNope.length === 0) {
+      state = resolveNopeWindow(state);
+    }
+  }
+
+  return state;
 }

@@ -164,6 +164,110 @@ function isCatCard(type: CardType): boolean {
   return ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat'].includes(type);
 }
 
+const NOPE_WINDOW_MS = 5000;
+
+function isNopeableCard(type: CardType): boolean {
+  return ['attack', 'skip', 'favor', 'shuffle', 'see_the_future'].includes(type);
+}
+
+function canAnyoneNope(state: GameState, excludePlayerId: string): boolean {
+  return state.players.some(p => p.isAlive && p.id !== excludePlayerId && p.hand.some(c => c.type === 'nope'));
+}
+
+function createNopeWindow(state: GameState, action: GameAction, cardPlayed: CardType): GameState {
+  // If nobody else has a Nope card, skip the window and execute immediately
+  if (!canAnyoneNope(state, action.playerId)) {
+    return executeNopeableAction(state, action, cardPlayed);
+  }
+  state.pendingAction = {
+    type: 'nope_window',
+    playerId: action.playerId,
+    sourcePlayerId: action.playerId,
+    cardPlayed,
+    expiresAt: Date.now() + NOPE_WINDOW_MS,
+    nopeChain: [],
+    passedPlayerIds: [],
+    originalAction: action,
+  };
+  state.logs.push({ message: `Waiting for Nope responses...`, timestamp: Date.now() });
+  return state;
+}
+
+function executeNopeableAction(state: GameState, action: GameAction, cardPlayed: CardType): GameState {
+  const player = state.players.find(p => p.id === action.playerId)!;
+  switch (cardPlayed) {
+    case 'attack': {
+      state.logs.push({ message: `${player.name} played Attack!`, timestamp: Date.now(), playerId: player.id });
+      const nextIdx = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+      state.currentPlayerIndex = nextIdx;
+      state.turnsRemaining = state.turnsRemaining + 1;
+      break;
+    }
+    case 'skip': {
+      state.logs.push({ message: `${player.name} played Skip!`, timestamp: Date.now(), playerId: player.id });
+      state.turnsRemaining--;
+      if (state.turnsRemaining <= 0) {
+        state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+        state.turnsRemaining = 1;
+      }
+      break;
+    }
+    case 'shuffle': {
+      state.deck = shuffle(state.deck);
+      state.logs.push({ message: `${player.name} shuffled the deck!`, timestamp: Date.now(), playerId: player.id });
+      break;
+    }
+    case 'see_the_future': {
+      const topCards = state.deck.slice(0, 3);
+      state.pendingAction = {
+        type: 'see_future',
+        playerId: action.playerId,
+        cards: topCards,
+      };
+      state.logs.push({ message: `${player.name} is seeing the future...`, timestamp: Date.now(), playerId: player.id });
+      break;
+    }
+    case 'favor': {
+      if (!action.targetPlayerId) throw new Error('Must target a player for Favor');
+      const target = state.players.find(p => p.id === action.targetPlayerId);
+      if (!target || !target.isAlive) throw new Error('Invalid target');
+      if (target.hand.length === 0) throw new Error('Target has no cards');
+      state.pendingAction = {
+        type: 'favor_give',
+        playerId: action.targetPlayerId,
+        sourcePlayerId: action.playerId,
+        cardPlayed: 'favor',
+      };
+      state.logs.push({ message: `${player.name} asked ${target.name} for a Favor!`, timestamp: Date.now(), playerId: player.id });
+      break;
+    }
+  }
+  return state;
+}
+
+export function resolveNopeWindow(game: GameState): GameState {
+  if (!game.pendingAction || game.pendingAction.type !== 'nope_window') return game;
+  let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs] };
+
+  const nopeCount = state.pendingAction!.nopeChain?.length ?? 0;
+  const originalAction = state.pendingAction!.originalAction!;
+  const cardPlayed = state.pendingAction!.cardPlayed!;
+  state.pendingAction = null;
+
+  if (nopeCount % 2 === 1) {
+    // Odd nopes = action cancelled
+    const player = state.players.find(p => p.id === originalAction.playerId);
+    state.logs.push({ message: `${player?.name}'s ${cardPlayed.replace(/_/g, ' ')} was Noped!`, timestamp: Date.now(), playerId: originalAction.playerId });
+  } else {
+    // Even nopes (including 0) = action proceeds
+    state = executeNopeableAction(state, originalAction, cardPlayed);
+  }
+
+  state.updatedAt = Date.now();
+  state.lastActionId++;
+  return state;
+}
+
 export function processAction(game: GameState, action: GameAction): GameState {
   let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs] };
 
@@ -227,65 +331,29 @@ export function processAction(game: GameState, action: GameAction): GameState {
       player.hand.splice(cardIndex, 1);
       state.discardPile.push(card);
 
-      switch (card.type) {
-        case 'attack': {
-          state.logs.push({ message: `${player.name} played Attack!`, timestamp: Date.now(), playerId: player.id });
-          const nextIdx = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
-          state.currentPlayerIndex = nextIdx;
-          state.turnsRemaining = state.turnsRemaining + 1; // stack attacks
-          break;
-        }
-        case 'skip': {
-          state.logs.push({ message: `${player.name} played Skip!`, timestamp: Date.now(), playerId: player.id });
-          state.turnsRemaining--;
-          if (state.turnsRemaining <= 0) {
-            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
-            state.turnsRemaining = 1;
+      if (card.type === 'nope') {
+        // Nope during a nope window — add to chain
+        if (state.pendingAction?.type === 'nope_window') {
+          state.pendingAction.nopeChain = [...(state.pendingAction.nopeChain || []), player.id];
+          state.pendingAction.passedPlayerIds = []; // Reset passes for new nope window
+          state.pendingAction.expiresAt = Date.now() + NOPE_WINDOW_MS;
+          state.logs.push({ message: `${player.name} played Nope! (${state.pendingAction.nopeChain.length} in chain)`, timestamp: Date.now(), playerId: player.id });
+          // Check if anyone else can counter-nope
+          if (!canAnyoneNope(state, player.id)) {
+            // No one can counter — resolve immediately
+            state = resolveNopeWindow(state);
           }
-          break;
+        } else {
+          throw new Error('Nothing to Nope — play Nope during a Nope window');
         }
-        case 'shuffle': {
-          state.deck = shuffle(state.deck);
-          state.logs.push({ message: `${player.name} shuffled the deck!`, timestamp: Date.now(), playerId: player.id });
-          break;
+      } else if (isNopeableCard(card.type)) {
+        // Nopeable card — create a nope window instead of executing immediately
+        state.logs.push({ message: `${player.name} played ${card.type.replace(/_/g, ' ')}!`, timestamp: Date.now(), playerId: player.id });
+        state = createNopeWindow(state, action, card.type);
+      } else {
+        if (isCatCard(card.type)) {
+          throw new Error('Cat cards must be played in pairs or triples');
         }
-        case 'see_the_future': {
-          const topCards = state.deck.slice(0, 3);
-          state.pendingAction = {
-            type: 'see_future',
-            playerId: action.playerId,
-            cards: topCards,
-          };
-          state.logs.push({ message: `${player.name} is seeing the future...`, timestamp: Date.now(), playerId: player.id });
-          break;
-        }
-        case 'favor': {
-          if (!action.targetPlayerId) throw new Error('Must target a player for Favor');
-          const target = state.players.find(p => p.id === action.targetPlayerId);
-          if (!target || !target.isAlive) throw new Error('Invalid target');
-          if (target.hand.length === 0) throw new Error('Target has no cards');
-          state.pendingAction = {
-            type: 'favor_give',
-            playerId: action.targetPlayerId,
-            sourcePlayerId: action.playerId,
-            cardPlayed: 'favor',
-          };
-          state.logs.push({ message: `${player.name} asked ${target.name} for a Favor!`, timestamp: Date.now(), playerId: player.id });
-          break;
-        }
-        case 'nope': {
-          if (!state.pendingAction) {
-            throw new Error('Nothing to Nope — play Nope when an action is pending');
-          }
-          state.logs.push({ message: `${player.name} played Nope!`, timestamp: Date.now(), playerId: player.id });
-          state.pendingAction = null;
-          break;
-        }
-        default:
-          if (isCatCard(card.type)) {
-            throw new Error('Cat cards must be played in pairs or triples');
-          }
-          break;
       }
       break;
     }
@@ -427,6 +495,34 @@ export function processAction(game: GameState, action: GameAction): GameState {
         state.logs.push({ message: `${target3.name} doesn't have that card!`, timestamp: Date.now(), playerId: player.id });
       }
       state.pendingAction = null;
+      break;
+    }
+
+    case 'nope_pass': {
+      if (!state.pendingAction || state.pendingAction.type !== 'nope_window') {
+        throw new Error('No Nope window active');
+      }
+      const passed = state.pendingAction.passedPlayerIds || [];
+      if (!passed.includes(player.id)) {
+        state.pendingAction.passedPlayerIds = [...passed, player.id];
+      }
+      // Check if all eligible players have passed
+      const eligiblePlayers = state.players.filter(p =>
+        p.isAlive && p.id !== state.pendingAction!.playerId && p.hand.some(c => c.type === 'nope')
+        && !(state.pendingAction!.nopeChain?.length && state.pendingAction!.nopeChain[state.pendingAction!.nopeChain.length - 1] === p.id) // last noper can't pass on their own nope
+      );
+      const allPassed = eligiblePlayers.every(p => state.pendingAction!.passedPlayerIds!.includes(p.id));
+      if (allPassed) {
+        state = resolveNopeWindow(state);
+      }
+      break;
+    }
+
+    case 'nope_resolve': {
+      if (!state.pendingAction || state.pendingAction.type !== 'nope_window') {
+        throw new Error('No Nope window to resolve');
+      }
+      state = resolveNopeWindow(state);
       break;
     }
   }

@@ -30,7 +30,7 @@ export interface Player {
 }
 
 export interface GameAction {
-  type: 'play_card' | 'draw' | 'defuse_place' | 'favor_give' | 'nope' | 'see_future_ack' | 'steal_target' | 'three_of_kind_target';
+  type: 'play_card' | 'draw' | 'defuse_place' | 'favor_give' | 'nope' | 'nope_pass' | 'nope_resolve' | 'see_future_ack' | 'steal_target' | 'three_of_kind_target';
   playerId: string;
   cardId?: string;
   cardIds?: string[];
@@ -46,6 +46,10 @@ export interface PendingAction {
   cards?: Card[]; // for see_future
   cardPlayed?: CardType; // card that triggered this
   expiresAt?: number;
+  // Nope window fields
+  nopeChain?: string[]; // player IDs who played Nopes (ordered)
+  passedPlayerIds?: string[]; // players who explicitly passed on Nope
+  originalAction?: Omit<GameAction, 'playerId'> & { playerId: string }; // the action being contested
 }
 
 export interface GameLog {
