@@ -71,6 +71,10 @@ export interface GameState {
   isMultiplayer: boolean;
   hostId: string;
   lastActionId: number;
+  // Rematch fields (multiplayer)
+  rematchRequests?: string[]; // player IDs who want a rematch
+  rematchGameId?: string; // new game ID once rematch is created
+  rematchCountdown?: number; // timestamp when countdown started (all accepted)
 }
 
 export const CARD_INFO: Record<CardType, { name: string; description: string; emoji: string; color: string }> = {

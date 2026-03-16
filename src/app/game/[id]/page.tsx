@@ -18,6 +18,7 @@ import SoundToggle from '@/components/game/SoundToggle';
 import QuickEmotes from '@/components/game/QuickEmotes';
 import StatsDisplay from '@/components/game/StatsDisplay';
 import ComboCoach from '@/components/game/ComboCoach';
+import AnimatedBackground from '@/components/game/AnimatedBackground';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
@@ -58,6 +59,56 @@ function getActionHint({
   return 'Selected cards are not a playable combo yet.';
 }
 
+function RematchCountdown({ startTime, durationMs, players }: { startTime: number; durationMs: number; players: Player[] }) {
+  const [remaining, setRemaining] = useState(durationMs);
+
+  useEffect(() => {
+    const tick = () => {
+      const elapsed = Date.now() - startTime;
+      setRemaining(Math.max(0, durationMs - elapsed));
+    };
+    tick();
+    const interval = setInterval(tick, 50);
+    return () => clearInterval(interval);
+  }, [startTime, durationMs]);
+
+  const seconds = Math.ceil(remaining / 1000);
+  const progress = 1 - remaining / durationMs;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-accent/10 border border-accent/30 rounded-2xl p-4 mb-2"
+    >
+      <p className="text-accent font-black text-sm uppercase tracking-widest mb-2">
+        Rematch starting in
+      </p>
+      <div className="flex items-center justify-center gap-3 mb-3">
+        <motion.span
+          key={seconds}
+          initial={{ scale: 1.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-4xl font-black text-white tabular-nums"
+        >
+          {seconds}
+        </motion.span>
+      </div>
+      <div className="h-1.5 rounded-full bg-black/40 overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-r from-accent to-[#ff8855] rounded-full"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+      <div className="flex justify-center gap-1.5 mt-3">
+        {players.map(p => (
+          <span key={p.id} className="text-lg">{AVATARS[p.avatar]}</span>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
@@ -83,6 +134,10 @@ export default function GamePage() {
   const [showStats, setShowStats] = useState(false);
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [rematchLoading, setRematchLoading] = useState(false);
+  const [rematchVotes, setRematchVotes] = useState<string[]>([]);
+  const [rematchCountdown, setRematchCountdown] = useState<number | null>(null);
+  const [rematchGameId, setRematchGameId] = useState<string | null>(null);
+  const rematchRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(2500);
   const [rankTitle, setRankTitle] = useState('Rookie Spark');
   const [levelInfo, setLevelInfo] = useState(() => getLevelInfo(getStats()));
@@ -232,11 +287,35 @@ export default function GamePage() {
 
       if (data.game.status === 'finished') {
         handleGameEnd(data.game);
+        // Sync rematch state from polled game
+        if (data.game.rematchRequests) {
+          setRematchVotes(data.game.rematchRequests);
+        }
+        if (data.game.rematchGameId && !rematchGameId) {
+          setRematchGameId(data.game.rematchGameId);
+          setRematchCountdown(data.game.rematchCountdown || Date.now());
+          // Look up our new player ID from the rematch API
+          fetch(`/api/games/${gameId}/rematch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playerId }),
+          })
+            .then(r => r.json())
+            .then(d => {
+              if (d.playerIdMap?.[playerId]) {
+                localStorage.setItem(`ek_player_${data.game.rematchGameId}`, d.playerIdMap[playerId]);
+              }
+              rematchRedirectTimerRef.current = setTimeout(() => {
+                router.push(`/game/${data.game.rematchGameId}`);
+              }, 5000);
+            })
+            .catch(() => {});
+        }
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
     }
-  }, [gameId, playerId]);
+  }, [gameId, playerId, rematchGameId, router]);
 
   function triggerExplosion() {
     setShowExplosion(true);
@@ -276,6 +355,7 @@ export default function GamePage() {
       if (xpGainTimerRef.current) clearTimeout(xpGainTimerRef.current);
       if (explosionTimerRef.current) clearTimeout(explosionTimerRef.current);
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (rematchRedirectTimerRef.current) clearTimeout(rematchRedirectTimerRef.current);
       pollAbortRef.current?.abort();
     };
   }, []);
@@ -299,9 +379,13 @@ export default function GamePage() {
   const gameStatusRef = useRef<string | undefined>(undefined);
   gameStatusRef.current = game?.status;
 
+  const rematchVotesRef = useRef<string[]>([]);
+  rematchVotesRef.current = rematchVotes;
+
   useEffect(() => {
     const computeInterval = () => {
       if (document.hidden) return 5000;
+      if (gameStatusRef.current === 'finished' && rematchVotesRef.current.length > 0) return 2000;
       if (gameStatusRef.current === 'finished') return 8000;
       if (gameStatusRef.current === 'waiting') return 3000;
       if (isMyTurnRef.current) return 1500;
@@ -320,14 +404,16 @@ export default function GamePage() {
 
   useEffect(() => {
     if (document.hidden) return;
-    if (game?.status === 'finished') {
+    if (game?.status === 'finished' && rematchVotes.length > 0) {
+      setPollIntervalMs(2000);
+    } else if (game?.status === 'finished') {
       setPollIntervalMs(8000);
     } else if (isMyTurn) {
       setPollIntervalMs(1500);
     } else {
       setPollIntervalMs(2500);
     }
-  }, [isMyTurn, game?.status]);
+  }, [isMyTurn, game?.status, rematchVotes.length]);
 
   useEffect(() => {
     if (!playerId) return;
@@ -576,10 +662,42 @@ export default function GamePage() {
     if (!game) return;
 
     if (game.isMultiplayer) {
-      router.push('/');
+      // Multiplayer rematch: vote via API
+      setRematchLoading(true);
+      try {
+        const res = await fetch(`/api/games/${gameId}/rematch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        if (data.status === 'ready' && data.rematchGameId) {
+          // Store new player ID mapping and redirect after countdown
+          if (data.playerIdMap?.[playerId]) {
+            localStorage.setItem(`ek_player_${data.rematchGameId}`, data.playerIdMap[playerId]);
+          }
+          setRematchGameId(data.rematchGameId);
+          setRematchCountdown(Date.now());
+          const delay = data.countdownMs || 5000;
+          rematchRedirectTimerRef.current = setTimeout(() => {
+            router.push(`/game/${data.rematchGameId}`);
+          }, delay);
+        } else {
+          // Update vote state
+          setRematchVotes(data.rematchRequests || []);
+          toast.success('Rematch vote cast! Waiting for others...');
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Failed to request rematch');
+      } finally {
+        setRematchLoading(false);
+      }
       return;
     }
 
+    // Single-player rematch
     setRematchLoading(true);
     try {
       const savedName = localStorage.getItem('ek_playerName') || myPlayer?.name || 'Player';
@@ -763,10 +881,10 @@ export default function GamePage() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden relative game-container-layer bg-bg">
+      {/* Animated background */}
+      <AnimatedBackground />
       <canvas ref={confettiRef} className="fixed inset-0 w-full h-full pointer-events-none z-[60]" />
       <canvas ref={particleRef} className="fixed inset-0 w-full h-full pointer-events-none z-[55]" />
-      <div className="pointer-events-none absolute -top-28 -left-16 w-64 h-64 rounded-full bg-accent/25 blur-[90px] hidden lg:block" />
-      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-success/20 blur-[100px] hidden lg:block" />
 
       <AnimatePresence>
         {flashColor && (
@@ -848,20 +966,55 @@ export default function GamePage() {
               )}
 
               <div className="flex flex-col gap-3 relative z-10">
+                {/* Rematch countdown overlay */}
+                {rematchCountdown && rematchGameId && (
+                  <RematchCountdown
+                    startTime={rematchCountdown}
+                    durationMs={5000}
+                    players={game.players.filter(p => !p.isAI)}
+                  />
+                )}
+
+                {/* Multiplayer rematch voting status */}
+                {game.isMultiplayer && rematchVotes.length > 0 && !rematchGameId && (
+                  <div className="bg-black/30 border border-white/5 rounded-2xl p-3 mb-1">
+                    <p className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2">Rematch Votes</p>
+                    <div className="flex justify-center gap-2 flex-wrap">
+                      {game.players.filter(p => !p.isAI).map(p => {
+                        const voted = rematchVotes.includes(p.id);
+                        return (
+                          <div key={p.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${voted ? 'bg-success/20 border border-success/30 text-success' : 'bg-white/5 border border-white/10 text-text-muted'}`}>
+                            <span className="text-base">{AVATARS[p.avatar]}</span>
+                            <span className="max-w-[60px] truncate">{p.name}</span>
+                            {voted && <span>&#10003;</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={handleRematch}
-                  disabled={rematchLoading}
+                  disabled={rematchLoading || !!rematchGameId || (game.isMultiplayer && rematchVotes.includes(playerId))}
                   className="w-full py-4 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-black text-lg tracking-wide shadow-[0_8px_24px_rgba(255,95,46,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-[#ff8d44]/50 disabled:opacity-50 min-h-[56px] relative overflow-hidden group"
                 >
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)] -skew-x-12 -translate-x-full group-hover:translate-x-full duration-1000" />
                   {rematchLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Creating...
+                      {game.isMultiplayer ? 'Voting...' : 'Creating...'}
                     </span>
+                  ) : rematchGameId ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Starting rematch...
+                    </span>
+                  ) : game.isMultiplayer && rematchVotes.includes(playerId) ? (
+                    'WAITING FOR OTHERS...'
                   ) : (
-                    game.isMultiplayer ? 'PLAY AGAIN' : 'REMATCH'
+                    'REMATCH'
                   )}
                 </motion.button>
                 <div className="flex gap-2">
