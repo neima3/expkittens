@@ -20,9 +20,10 @@ import StatsDisplay from '@/components/game/StatsDisplay';
 import PostMatchSummary from '@/components/game/PostMatchSummary';
 import ComboCoach from '@/components/game/ComboCoach';
 import AnimatedBackground from '@/components/game/AnimatedBackground';
+import CardPreviewOverlay from '@/components/game/CardPreviewOverlay';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
-import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
+import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
 import type { ProgressUpdate } from '@/lib/stats';
 import { AVATARS } from '@/types/game';
 
@@ -209,6 +210,7 @@ export default function GamePage() {
   const [showWinner, setShowWinner] = useState(false);
   const [floatingEmote, setFloatingEmote] = useState<string | null>(null);
   const [showLog, setShowLog] = useState(false);
+  const [previewCardType, setPreviewCardType] = useState<CardType | null>(null);
   const [flashColor, setFlashColor] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [showHotkeys, setShowHotkeys] = useState(false);
@@ -659,6 +661,7 @@ export default function GamePage() {
         applyProgressUpdate(recordCardPlayed());
         const playedCard = myPlayer?.hand.find((c: Card) => c.id === actionData.cardId);
         if (playedCard) {
+          recordCardTypePlayed(playedCard.type);
           const cardColor = CARD_INFO[playedCard.type].color;
           setFlashColor(cardColor);
           if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
@@ -1171,6 +1174,8 @@ export default function GamePage() {
 
       <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
 
+      <CardPreviewOverlay cardType={previewCardType} />
+
       <AnimatePresence>
         {showHotkeys && (
           <motion.div
@@ -1651,7 +1656,7 @@ export default function GamePage() {
               <DrawPile count={game.deck.length} onClick={drawCard} disabled={actionLoading || hasPendingAction} isMyTurn={isMyTurn} />
             </div>
             <div className="lg:scale-[1.3] lg:origin-center">
-              <DiscardPile cards={game.discardPile} />
+              <DiscardPile cards={game.discardPile} onPreview={setPreviewCardType} onPreviewEnd={() => setPreviewCardType(null)} />
             </div>
           </div>
 
@@ -1778,6 +1783,8 @@ export default function GamePage() {
             selectedCards={selectedCards}
             onCardClick={handleCardClick}
             disabled={(!isMyTurn && !favorGiveMode && !isPendingOnMe) || actionLoading}
+            onPreview={setPreviewCardType}
+            onPreviewEnd={() => setPreviewCardType(null)}
           />
         </div>
       </div>
