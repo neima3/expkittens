@@ -7,11 +7,19 @@ interface DangerMeterProps {
   deckSize: number;
   alivePlayers: number;
   defuseCount?: number;
+  discardedEKs?: number;
 }
 
-export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount = 0 }: DangerMeterProps) {
-  const ekRemaining = Math.max(0, alivePlayers - 1);
-  const danger = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
+export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount = 0, discardedEKs = 0 }: DangerMeterProps) {
+  // Adjusted EK count: subtract known defused/discarded kittens
+  const ekRemaining = Math.max(0, alivePlayers - 1 - discardedEKs);
+  const rawDanger = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
+  const rawPercent = Math.round(rawDanger * 100);
+
+  // Effective danger: account for defuse cards as safety buffer
+  // Each defuse negates one bomb encounter, reducing effective lethal threats
+  const effectiveThreats = Math.max(0, ekRemaining - defuseCount);
+  const danger = deckSize > 0 ? Math.min(1, effectiveThreats / deckSize) : 0;
   const percent = Math.round(danger * 100);
   const shielded = defuseCount > 0;
 
@@ -20,19 +28,22 @@ export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount =
   let label = shielded ? 'Shielded' : 'Safe';
 
   if (danger > 0.5) {
-    color = shielded ? '#ffb833' : '#ff3355';
-    glow = shielded ? 'rgba(255,184,51,0.4)' : 'rgba(255,51,85,0.6)';
-    label = shielded ? 'Risky' : 'Extreme';
-  }
-  else if (danger > 0.3) {
-    color = shielded ? '#ffb833' : '#ff5f2e';
-    glow = shielded ? 'rgba(255,184,51,0.2)' : 'rgba(255,95,46,0.4)';
-    label = shielded ? 'Caution' : 'High';
-  }
-  else if (danger > 0.15) {
-    color = '#ffb833'; // warning
+    color = '#ff3355';
+    glow = 'rgba(255,51,85,0.6)';
+    label = 'Extreme';
+  } else if (danger > 0.3) {
+    color = '#ff5f2e';
+    glow = 'rgba(255,95,46,0.4)';
+    label = 'High';
+  } else if (danger > 0.15) {
+    color = '#ffb833';
     glow = 'rgba(255,184,51,0.2)';
     label = shielded ? 'Guarded' : 'Medium';
+  } else if (rawDanger > 0.15 && shielded) {
+    // Raw danger is notable but defuses bring effective danger down
+    color = '#2bd47c';
+    glow = 'rgba(43,212,124,0.15)';
+    label = 'Shielded';
   }
 
   return (
@@ -66,12 +77,19 @@ export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount =
           />
         </div>
       </div>
-      <span className="font-black text-white/90 min-w-[28px] text-right text-[10px] tracking-wider">
-        {percent}%
-      </span>
+      <div className="flex flex-col items-end min-w-[28px]">
+        <span className="font-black text-white/90 text-[10px] tracking-wider leading-none">
+          {percent}%
+        </span>
+        {rawPercent !== percent && (
+          <span className="text-[7px] text-white/40 leading-none mt-0.5" title={`Raw draw chance: ${rawPercent}%`}>
+            {rawPercent}% raw
+          </span>
+        )}
+      </div>
       {shielded && (
-        <span className="text-success text-[9px] font-bold" title={`${defuseCount} Defuse card${defuseCount > 1 ? 's' : ''}`}>
-          🛡️
+        <span className="text-success text-[9px] font-bold" title={`${defuseCount} Defuse card${defuseCount > 1 ? 's' : ''} — absorb${defuseCount === 1 ? 's' : ''} ${defuseCount} bomb${defuseCount > 1 ? 's' : ''}`}>
+          🛡️×{defuseCount}
         </span>
       )}
     </div>

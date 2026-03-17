@@ -13,6 +13,7 @@ interface ComboCoachProps {
   selectingThreeTarget: boolean;
   deckSize: number;
   alivePlayers: number;
+  discardedEKs?: number;
 }
 
 function isCat(type: Card['type']) {
@@ -35,6 +36,7 @@ export default memo(function ComboCoach({
   selectingThreeTarget,
   deckSize,
   alivePlayers,
+  discardedEKs = 0,
 }: ComboCoachProps) {
   const grouped = countByType(hand);
   const catGroups = [...grouped.entries()].filter(([type]) => isCat(type as Card['type']));
@@ -42,13 +44,17 @@ export default memo(function ComboCoach({
   const tripleCount = catGroups.reduce((sum, [, count]) => sum + Math.floor(count / 3), 0);
 
   const hasDefuse = grouped.has('defuse');
+  const defuseCount = grouped.get('defuse') ?? 0;
   const hasSeeFuture = grouped.has('see_the_future');
   const hasAttack = grouped.has('attack');
   const hasSkip = grouped.has('skip');
   const hasShuffle = grouped.has('shuffle');
 
-  const expectedKittens = Math.max(0, alivePlayers - 1);
-  const danger = deckSize > 0 ? expectedKittens / deckSize : 0;
+  // Adjusted danger: account for known discarded EKs and defuse buffer
+  const ekRemaining = Math.max(0, alivePlayers - 1 - discardedEKs);
+  const rawDanger = deckSize > 0 ? ekRemaining / deckSize : 0;
+  const effectiveThreats = Math.max(0, ekRemaining - defuseCount);
+  const danger = deckSize > 0 ? effectiveThreats / deckSize : 0;
   const dangerPct = Math.round(danger * 100);
 
   const tips: string[] = [];
@@ -58,16 +64,18 @@ export default memo(function ComboCoach({
   } else if (!isMyTurn) {
     tips.push('Track who is low on cards and target them with Favor/pairs next turn.');
   } else {
-    if (!hasDefuse && danger > 0.1) {
+    if (!hasDefuse && rawDanger > 0.1) {
       tips.push('No Defuse in hand. Avoid risky draws if possible.');
+    } else if (hasDefuse && defuseCount === 1 && ekRemaining > 1 && rawDanger > 0.2) {
+      tips.push(`Only 1 Defuse vs ${ekRemaining} bombs in deck — conserve it or steal another.`);
     }
-    if (hasSeeFuture && danger > 0.12) {
+    if (hasSeeFuture && rawDanger > 0.12) {
       tips.push('Play See the Future before drawing to reduce bomb risk.');
     }
-    if ((hasAttack || hasSkip) && danger > 0.18) {
+    if ((hasAttack || hasSkip) && rawDanger > 0.18) {
       tips.push('Attack/Skip can dodge a dangerous draw this turn.');
     }
-    if (hasShuffle && danger > 0.25) {
+    if (hasShuffle && rawDanger > 0.25) {
       tips.push('Shuffle can break dangerous known top-deck sequences.');
     }
     if (tripleCount > 0) {

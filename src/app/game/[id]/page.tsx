@@ -252,6 +252,7 @@ export default function GamePage() {
   const hasPendingAction = !!game?.pendingAction;
   const isPendingOnMe = game?.pendingAction?.playerId === playerId;
   const alivePlayers = useMemo(() => game?.players.filter(p => p.isAlive).length ?? 0, [game?.players]);
+  const discardedEKs = useMemo(() => game?.discardPile.filter(c => c.type === 'exploding_kitten').length ?? 0, [game?.discardPile]);
   const selectedCard = useMemo(
     () => selectedCards.length > 0 ? myPlayer?.hand.find(c => c.id === selectedCards[0]) : null,
     [selectedCards, myPlayer?.hand]
@@ -1683,7 +1684,7 @@ export default function GamePage() {
                 </span>
               )}
             </motion.div>
-            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} />
+            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} discardedEKs={discardedEKs} />
           </div>
 
           {/* Desktop Turn Indicator */}
@@ -1761,6 +1762,7 @@ export default function GamePage() {
               selectingThreeTarget={selectingThreeTarget}
               deckSize={game.deck.length}
               alivePlayers={alivePlayers}
+              discardedEKs={discardedEKs}
             />
           </div>
 
@@ -1779,7 +1781,7 @@ export default function GamePage() {
         {/* RIGHT SIDEBAR (Desktop) */}
         <div className="hidden lg:flex flex-col gap-4 p-5 border-l border-white/5 bg-black/20 overflow-y-auto">
           <div className="glass-panel p-5 rounded-2xl flex flex-col gap-5">
-            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} />
+            <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} discardedEKs={discardedEKs} />
           </div>
 
           {(game.spectators?.length || 0) > 0 && (
