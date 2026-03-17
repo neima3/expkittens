@@ -22,6 +22,7 @@ import PostMatchSummary from '@/components/game/PostMatchSummary';
 import ComboCoach from '@/components/game/ComboCoach';
 import AnimatedBackground from '@/components/game/AnimatedBackground';
 import CardPreviewOverlay from '@/components/game/CardPreviewOverlay';
+import SpectatorView from '@/components/game/SpectatorView';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
@@ -193,8 +194,11 @@ export default function GamePage() {
   const searchParams = useSearchParams();
   const gameId = params.id as string;
   const playerIdParam = searchParams.get('playerId');
+  const spectateParam = searchParams.get('spectate');
   const [game, setGame] = useState<GameState | null>(null);
   const [playerId, setPlayerId] = useState<string>('');
+  const [spectatorId, setSpectatorId] = useState<string>('');
+  const [spectatorName, setSpectatorName] = useState<string>('');
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -357,13 +361,16 @@ export default function GamePage() {
   }
 
   const poll = useCallback(async () => {
-    if (!playerId || actionLoadingRef.current) return;
+    if ((!playerId && !spectatorId) || actionLoadingRef.current) return;
     pollAbortRef.current?.abort();
     const controller = new AbortController();
     pollAbortRef.current = controller;
     try {
+      const idParam = spectatorId
+        ? `spectatorId=${spectatorId}`
+        : `playerId=${playerId}`;
       const res = await fetch(
-        `/api/games/${gameId}/poll?playerId=${playerId}&lastActionId=${lastActionIdRef.current}`,
+        `/api/games/${gameId}/poll?${idParam}&lastActionId=${lastActionIdRef.current}`,
         { signal: controller.signal }
       );
       const data = await res.json();
@@ -497,7 +504,57 @@ export default function GamePage() {
     };
   }, []);
 
+  // Join as spectator (external)
+  const joinAsSpectator = useCallback(async () => {
+    try {
+      const savedName = localStorage.getItem('ek_playerName') || 'Spectator';
+      const savedAvatar = parseInt(localStorage.getItem('ek_avatar') || '0');
+      const res = await fetch(`/api/games/${gameId}/spectate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: savedName, avatar: savedAvatar }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSpectatorId(data.spectatorId);
+      setSpectatorName(savedName);
+      localStorage.setItem(`ek_spectator_${gameId}`, data.spectatorId);
+      localStorage.setItem(`ek_spectatorName_${gameId}`, savedName);
+      setGame(data.game);
+      lastActionIdRef.current = data.game.lastActionId;
+      setLoading(false);
+    } catch (err: unknown) {
+      console.error('Spectate join error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to join as spectator');
+      setLoading(false);
+    }
+  }, [gameId]);
+
   useEffect(() => {
+    // Check for spectator mode first
+    if (spectateParam === 'true') {
+      const existingSpecId = localStorage.getItem(`ek_spectator_${gameId}`);
+      if (existingSpecId) {
+        setSpectatorId(existingSpecId);
+        setSpectatorName(localStorage.getItem(`ek_spectatorName_${gameId}`) || 'Spectator');
+        // Fetch game with spectator view
+        fetch(`/api/games/${gameId}?spectatorId=${existingSpecId}`)
+          .then(r => r.json())
+          .then(data => {
+            setGame(data.game);
+            lastActionIdRef.current = data.game.lastActionId;
+            setLoading(false);
+          })
+          .catch(() => {
+            // If existing spectator ID is invalid, rejoin
+            joinAsSpectator();
+          });
+      } else {
+        joinAsSpectator();
+      }
+      return;
+    }
+
     const pid = localStorage.getItem(`ek_player_${gameId}`) || playerIdParam;
     if (!pid) {
       router.push('/');
@@ -509,7 +566,7 @@ export default function GamePage() {
     setRankTitle(getRankInfo(stats).title);
     setLevelInfo(getLevelInfo(stats));
     fetchGame(pid);
-  }, [gameId, fetchGame, playerIdParam, router]);
+  }, [gameId, fetchGame, playerIdParam, router, spectateParam, joinAsSpectator]);
 
   const isMyTurnRef = useRef(false);
   isMyTurnRef.current = isMyTurn;
@@ -553,12 +610,12 @@ export default function GamePage() {
   }, [isMyTurn, game?.status, rematchVotes.length]);
 
   useEffect(() => {
-    if (!playerId) return;
+    if (!playerId && !spectatorId) return;
     pollIntervalRef.current = setInterval(poll, pollIntervalMs);
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [playerId, poll, pollIntervalMs]);
+  }, [playerId, spectatorId, poll, pollIntervalMs]);
 
   useEffect(() => {
     if (isMyTurn && game?.status === 'playing') {
@@ -928,6 +985,18 @@ export default function GamePage() {
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full" />
         <p className="text-text-muted text-sm">Loading game...</p>
       </div>
+    );
+  }
+
+  // External spectator view
+  if (spectatorId && game) {
+    return (
+      <SpectatorView
+        game={game}
+        spectatorId={spectatorId}
+        spectatorName={spectatorName}
+        onLeave={() => router.push('/')}
+      />
     );
   }
 
@@ -1477,6 +1546,11 @@ export default function GamePage() {
           />
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {(game.spectators?.length || 0) > 0 && (
+            <span className="px-2 py-1 rounded-lg bg-[#6366f1]/10 border border-[#6366f1]/30 text-[10px] font-bold text-[#a5b4fc]">
+              👁 {game.spectators!.length}
+            </span>
+          )}
           <button
             onClick={() => setShowHotkeys(prev => !prev)}
             className="w-10 h-10 rounded-lg bg-surface-light/85 border border-border flex items-center justify-center text-xs active:border-accent transition-colors"
@@ -1503,14 +1577,16 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
+      {/* Eliminated player spectator view */}
       {myPlayer && !myPlayer.isAlive && game.status === 'playing' && (
-        <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-6xl mb-4">💀</p>
-            <p className="text-2xl font-bold text-danger mb-2">You Exploded!</p>
-            <p className="text-text-muted mb-4">Watching the game...</p>
-            <button onClick={() => router.push('/')} className="px-6 py-2 rounded-xl bg-surface-light border border-border text-text hover:border-accent transition-colors">Leave Game</button>
-          </div>
+        <div className="absolute inset-0 z-40">
+          <SpectatorView
+            game={game}
+            spectatorId={playerId}
+            spectatorName={myPlayer.name}
+            isEliminatedPlayer
+            onLeave={() => router.push('/')}
+          />
         </div>
       )}
 
@@ -1519,11 +1595,22 @@ export default function GamePage() {
         
         {/* LEFT SIDEBAR (Desktop) */}
         <div className="hidden lg:flex flex-col gap-4 p-5 border-r border-white/5 bg-black/20 overflow-y-auto">
-          <div className="glass-panel p-4 rounded-2xl text-center">
-            <span className="status-pill text-xs mb-3 block">Room {game.code}</span>
+          <div className="glass-panel p-4 rounded-2xl text-center space-y-2">
+            <span className="status-pill text-xs mb-1 block">Room {game.code}</span>
             <button onClick={() => { navigator.clipboard.writeText(game.code); toast.success('Code copied'); }} className="text-sm font-bold text-text-muted hover:text-accent transition-colors w-full bg-surface-light/50 py-2 rounded-xl border border-border">
               Copy Code
             </button>
+            {game.isMultiplayer && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/game/${gameId}?spectate=true`);
+                  toast.success('Spectator link copied');
+                }}
+                className="text-xs text-[#a5b4fc] hover:text-[#c7d2fe] transition-colors w-full bg-[#6366f1]/10 py-1.5 rounded-lg border border-[#6366f1]/20"
+              >
+                👁 Copy Spectator Link
+              </button>
+            )}
           </div>
           <div className="flex-1 glass-panel rounded-2xl flex flex-col overflow-hidden">
             <div className="p-4 border-b border-white/5 text-sm font-black text-text-muted uppercase tracking-wider bg-surface-light/40">
@@ -1691,6 +1778,15 @@ export default function GamePage() {
           <div className="glass-panel p-5 rounded-2xl flex flex-col gap-5">
             <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} />
           </div>
+
+          {(game.spectators?.length || 0) > 0 && (
+            <div className="glass-panel p-4 rounded-2xl flex items-center gap-2">
+              <span className="text-sm">👁</span>
+              <span className="text-xs font-bold text-[#a5b4fc]">
+                {game.spectators!.length} spectator{game.spectators!.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
           
           <div className="glass-panel p-5 rounded-2xl flex flex-col gap-3 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-success to-accent"></div>

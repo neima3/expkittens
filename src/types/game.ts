@@ -69,7 +69,14 @@ export interface SeriesState {
   seriesWinnerId?: string; // set when series is decided
 }
 
-export type GameLogType = 'system' | 'chat' | 'preset';
+export interface Spectator {
+  id: string;
+  name: string;
+  avatar: number;
+  joinedAt: number;
+}
+
+export type GameLogType = 'system' | 'chat' | 'preset' | 'spectator_chat';
 
 export interface GameLog {
   message: string;
@@ -102,6 +109,8 @@ export interface GameState {
   rematchCountdown?: number; // timestamp when countdown started (all accepted)
   // Series/tournament fields
   series?: SeriesState;
+  // Spectator fields
+  spectators?: Spectator[];
 }
 
 export const CARD_INFO: Record<CardType, { name: string; description: string; emoji: string; color: string }> = {

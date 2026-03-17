@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
-import { getPlayerView, resolveNopeWindow } from '@/lib/game-engine';
+import { getPlayerView, getSpectatorView, resolveNopeWindow } from '@/lib/game-engine';
 import { processAITurn } from '@/lib/ai';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -8,6 +8,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     await initializeDatabase();
     const { id } = await params;
     const playerId = req.nextUrl.searchParams.get('playerId');
+    const spectatorId = req.nextUrl.searchParams.get('spectatorId');
     const lastActionId = parseInt(req.nextUrl.searchParams.get('lastActionId') || '0');
 
     const rawGame = await getGameById(id);
@@ -39,9 +40,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ changed: false, lastActionId: game.lastActionId });
     }
 
+    let viewGame;
+    if (spectatorId) {
+      viewGame = getSpectatorView(game);
+    } else if (playerId) {
+      viewGame = getPlayerView(game, playerId);
+    } else {
+      viewGame = game;
+    }
+
     return NextResponse.json({
       changed: true,
-      game: playerId ? getPlayerView(game, playerId) : game,
+      game: viewGame,
       lastActionId: game.lastActionId,
     });
   } catch (error: unknown) {

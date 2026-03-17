@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
-import { getPlayerView, startGame } from '@/lib/game-engine';
+import { getPlayerView, getSpectatorView, startGame } from '@/lib/game-engine';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await initializeDatabase();
     const { id } = await params;
     const playerId = req.nextUrl.searchParams.get('playerId');
+    const spectatorId = req.nextUrl.searchParams.get('spectatorId');
 
     const game = await getGameById(id);
     if (!game) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
+
+    if (spectatorId) {
+      return NextResponse.json({ game: getSpectatorView(game) });
     }
 
     if (playerId) {

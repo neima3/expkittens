@@ -595,6 +595,23 @@ export function processAction(game: GameState, action: GameAction): GameState {
   return state;
 }
 
+export function getSpectatorView(game: GameState): GameState {
+  // Spectators see card counts but never card contents, and no spectator_chat in logs for players
+  return {
+    ...game,
+    deck: game.deck.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })),
+    players: game.players.map(p => ({
+      ...p,
+      hand: p.hand.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })),
+    })),
+    pendingAction: game.pendingAction
+      ? { ...game.pendingAction, cards: undefined }
+      : null,
+    // Only include spectator_chat logs for spectators; strip them from player views
+    logs: game.logs,
+  };
+}
+
 export function getPlayerView(game: GameState, playerId: string): GameState {
   // Return game state with hidden information for other players
   return {
@@ -610,5 +627,7 @@ export function getPlayerView(game: GameState, playerId: string): GameState {
           cards: game.pendingAction.playerId === playerId ? game.pendingAction.cards : undefined,
         }
       : null,
+    // Filter out spectator chat from player views
+    logs: game.logs.filter(l => l.type !== 'spectator_chat'),
   };
 }
