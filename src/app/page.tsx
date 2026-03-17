@@ -31,6 +31,7 @@ function HomeContent() {
   const [avatar, setAvatar] = useState(0);
   const [mode, setMode] = useState<'ai' | 'multiplayer'>('ai');
   const [aiCount, setAiCount] = useState(1);
+  const [bestOf, setBestOf] = useState<0 | 3 | 5>(0); // 0 = single match
   const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
   const [showStats, setShowStats] = useState(false);
@@ -76,6 +77,7 @@ function HomeContent() {
           avatar,
           mode: mode === 'ai' ? 'single' : 'multiplayer',
           aiCount,
+          bestOf: bestOf || undefined,
         }),
       });
       const data = await res.json();
@@ -349,6 +351,32 @@ function HomeContent() {
                   </div>
                 </div>
               )}
+
+              <div className="mb-10">
+                <label className="text-sm lg:text-base font-bold text-text-muted mb-3 block uppercase tracking-wider">Match Type</label>
+                <div className="grid grid-cols-3 gap-3 lg:gap-4">
+                  {([0, 3, 5] as const).map(n => (
+                    <motion.button
+                      key={n}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => setBestOf(n)}
+                      className={`py-4 rounded-2xl font-bold text-sm transition-all ${
+                        bestOf === n
+                          ? 'cta-primary shadow-lg'
+                          : 'bg-surface-light/70 text-text-muted hover:text-text border-2 border-border hover:border-text-muted/50'
+                      }`}
+                    >
+                      {n === 0 ? 'Single' : `Best of ${n}`}
+                    </motion.button>
+                  ))}
+                </div>
+                {bestOf > 0 && (
+                  <p className="text-text-muted text-xs mt-2">
+                    First to {Math.ceil(bestOf / 2)} wins takes the series
+                  </p>
+                )}
+              </div>
 
               <motion.button
                 id="create-game-btn"

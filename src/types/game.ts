@@ -52,6 +52,23 @@ export interface PendingAction {
   originalAction?: Omit<GameAction, 'playerId'> & { playerId: string }; // the action being contested
 }
 
+export interface SeriesMatchResult {
+  gameId: string;
+  winnerId: string;
+  winnerName: string;
+  matchNumber: number;
+}
+
+export interface SeriesState {
+  seriesId: string;
+  bestOf: 3 | 5;
+  currentMatch: number; // 1-indexed
+  scores: Record<string, number>; // playerId -> wins
+  playerNames: Record<string, string>; // playerId -> name (stable across rematches)
+  history: SeriesMatchResult[];
+  seriesWinnerId?: string; // set when series is decided
+}
+
 export interface GameLog {
   message: string;
   timestamp: number;
@@ -79,6 +96,8 @@ export interface GameState {
   rematchRequests?: string[]; // player IDs who want a rematch
   rematchGameId?: string; // new game ID once rematch is created
   rematchCountdown?: number; // timestamp when countdown started (all accepted)
+  // Series/tournament fields
+  series?: SeriesState;
 }
 
 export const CARD_INFO: Record<CardType, { name: string; description: string; emoji: string; color: string }> = {

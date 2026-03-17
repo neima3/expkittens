@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import type { GameState, Card, CardType, Player } from '@/types/game';
+import type { GameState, Card, CardType, Player, SeriesState } from '@/types/game';
 import { CARD_INFO, CAT_CARD_TYPES } from '@/types/game';
 import GameCard from '@/components/game/GameCard';
 import PlayerHand from '@/components/game/PlayerHand';
@@ -17,6 +17,7 @@ import DangerMeter from '@/components/game/DangerMeter';
 import SoundToggle from '@/components/game/SoundToggle';
 import QuickEmotes from '@/components/game/QuickEmotes';
 import StatsDisplay from '@/components/game/StatsDisplay';
+import PostMatchSummary from '@/components/game/PostMatchSummary';
 import ComboCoach from '@/components/game/ComboCoach';
 import AnimatedBackground from '@/components/game/AnimatedBackground';
 import { sounds } from '@/lib/sounds';
@@ -57,6 +58,81 @@ function getActionHint({
   if (selectedCards.length === 0) return 'Select cards to play, or draw to end your turn.';
   if (canPlay) return 'You can play now or keep building a stronger combo.';
   return 'Selected cards are not a playable combo yet.';
+}
+
+function SeriesScoreBar({ series, players, compact }: { series: SeriesState; players: Player[]; compact?: boolean }) {
+  const winsNeeded = Math.ceil(series.bestOf / 2);
+
+  // Check if any player is at match point
+  const matchPointNames = Object.entries(series.scores)
+    .filter(([, wins]) => wins === winsNeeded - 1)
+    .map(([name]) => name);
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-surface-light/60 border border-border/50 text-xs">
+        <span className="font-bold text-warning">Bo{series.bestOf}</span>
+        <span className="text-text-muted">G{series.currentMatch}</span>
+        <div className="flex gap-1.5">
+          {Object.entries(series.scores).map(([name, wins]) => (
+            <span key={name} className={`font-bold ${wins === winsNeeded - 1 ? 'text-danger' : 'text-text'}`}>
+              {name.slice(0, 6)}:{wins}
+            </span>
+          ))}
+        </div>
+        {matchPointNames.length > 0 && (
+          <span className="text-danger font-black animate-pulse">MP</span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full flex justify-center"
+    >
+      <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-surface-light/60 border border-border/50 backdrop-blur-sm shadow-sm">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-black text-warning">Best of {series.bestOf}</span>
+          <span className="text-text-muted text-xs">|</span>
+          <span className="text-xs text-text-muted font-medium">Match {series.currentMatch}</span>
+        </div>
+        <div className="h-4 w-px bg-border/50" />
+        <div className="flex gap-3">
+          {players.filter(p => !p.isAI || series.playerNames[p.id]).map(p => {
+            const name = series.playerNames[p.id] || p.name;
+            const wins = series.scores[name] || 0;
+            const isMatchPoint = wins === winsNeeded - 1;
+            return (
+              <div key={p.id} className="flex items-center gap-1.5">
+                <span className="text-lg">{AVATARS[p.avatar]}</span>
+                <span className="text-sm font-bold text-text">{name}</span>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: winsNeeded }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2.5 h-2.5 rounded-full border ${
+                        i < wins
+                          ? 'bg-success border-success shadow-[0_0_6px_rgba(43,212,124,0.5)]'
+                          : 'bg-transparent border-border/60'
+                      }`}
+                    />
+                  ))}
+                </div>
+                {isMatchPoint && (
+                  <span className="text-[10px] font-black text-danger uppercase tracking-wider animate-pulse">
+                    MP
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 function RematchCountdown({ startTime, durationMs, players }: { startTime: number; durationMs: number; players: Player[] }) {
@@ -145,6 +221,9 @@ export default function GamePage() {
   const [rankTitle, setRankTitle] = useState('Rookie Spark');
   const [levelInfo, setLevelInfo] = useState(() => getLevelInfo(getStats()));
   const [xpGain, setXpGain] = useState<number | null>(null);
+  const [progressUpdate, setProgressUpdate] = useState<ProgressUpdate | null>(null);
+  const [matchStats, setMatchStats] = useState({ cardsDrawn: 0, defusesUsed: 0, opponentsEliminated: 0 });
+  const [showPostMatchSummary, setShowPostMatchSummary] = useState(false);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,6 +273,7 @@ export default function GamePage() {
   );
 
   const applyProgressUpdate = useCallback((update: ProgressUpdate) => {
+    setProgressUpdate(update);
     if (update.gainedXp > 0) {
       setXpGain(update.gainedXp);
       if (xpGainTimerRef.current) clearTimeout(xpGainTimerRef.current);
@@ -365,7 +445,24 @@ export default function GamePage() {
   }
 
   function handleGameEnd(g: GameState) {
-    setShowWinner(true);
+    // Calculate match stats from game logs
+    let cardsDrawn = 0;
+    let defusesUsed = 0;
+    let opponentsEliminated = 0;
+    
+    g.logs.forEach(log => {
+      if (log.playerId === playerId) {
+        if (log.message.includes('drew')) cardsDrawn++;
+        if (log.message.includes('defused')) defusesUsed++;
+      }
+      if (log.message.includes('exploded') && log.playerId !== playerId) {
+        opponentsEliminated++;
+      }
+    });
+    
+    setMatchStats({ cardsDrawn, defusesUsed, opponentsEliminated });
+    setShowPostMatchSummary(true);
+    
     if (hasRecordedResult.current) return;
     hasRecordedResult.current = true;
     if (g.winnerId === playerId) {
@@ -761,6 +858,7 @@ export default function GamePage() {
           avatar: avatarIdx,
           mode: 'single',
           aiCount: aiPlayerCount,
+          bestOf: game.series?.bestOf,
         }),
       });
       const data = await res.json();
@@ -855,7 +953,14 @@ export default function GamePage() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-panel rounded-[1.75rem] max-w-lg w-full p-5 md:p-8 text-center"
         >
-          <span className="status-pill mb-4">Lobby Open</span>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="status-pill">Lobby Open</span>
+            {game.series && (
+              <span className="status-pill bg-warning/20 border-warning/40 text-warning">
+                Best of {game.series.bestOf}
+              </span>
+            )}
+          </div>
           <h2 className="display-font text-3xl text-warning mb-2">Invite Your Friends</h2>
           <p className="text-text-muted mb-5">Share this code and fill the table.</p>
 
@@ -1051,126 +1156,18 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showWinner && game.winnerId && (
-          <motion.div initial={{ opacity: 0, backdropFilter: 'blur(0px)' }} animate={{ opacity: 1, backdropFilter: 'blur(8px)' }} className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overscroll-contain">
-            <motion.div 
-              initial={{ scale: 0.8, y: 50, opacity: 0 }} 
-              animate={{ scale: 1, y: 0, opacity: 1 }} 
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative bg-[linear-gradient(165deg,#1f183b_0%,#130f25_100%)] rounded-[2.5rem] p-8 md:p-10 text-center max-w-sm w-full border border-white/10 shadow-[0_32px_64px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] max-h-[90vh] overflow-y-auto scroll-touch"
-            >
-              <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[150%] h-40 blur-[60px] pointer-events-none rounded-full ${game.winnerId === playerId ? 'bg-warning/20' : 'bg-danger/20'}`} />
-
-              <motion.div animate={{ rotate: [0, -5, 5, -5, 0], scale: [1, 1.1, 1] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} className="text-8xl mb-6 drop-shadow-[0_0_30px_rgba(255,184,51,0.4)]">
-                {game.winnerId === playerId ? '🏆' : '💀'}
-              </motion.div>
-              
-              <h2 className="display-font text-4xl mb-3 bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent drop-shadow-md">
-                {game.winnerId === playerId ? 'VICTORY' : 'DEFEAT'}
-              </h2>
-              <p className="text-text-muted mb-8 font-medium">
-                {game.winnerId === playerId ? 'You survived the exploding kittens!' : `${game.players.find(p => p.id === game.winnerId)?.name} survived.`}
-              </p>
-
-              {game.winnerId === playerId && (
-                <div className="mb-8 bg-black/30 border border-white/5 rounded-2xl p-4 shadow-inner">
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <span className="px-3 py-1 rounded-full border border-warning/30 bg-warning/10 text-warning text-[10px] font-black uppercase tracking-widest shadow-[0_0_12px_rgba(255,184,51,0.2)]">
-                      {rankTitle}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1.5 px-1">
-                    <span>Lv.{levelInfo.level}</span>
-                    <span>{Math.max(0, levelInfo.nextLevelXp - levelInfo.xp)} XP to next</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-black/60 overflow-hidden shadow-inner">
-                    <motion.div 
-                      className="h-full bg-gradient-to-r from-success/50 to-success rounded-full"
-                      style={{ boxShadow: '0 0 10px rgba(43,212,124,0.6)' }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.round(levelInfo.progress * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3 relative z-10">
-                {/* Rematch countdown overlay */}
-                {rematchCountdown && rematchGameId && (
-                  <RematchCountdown
-                    startTime={rematchCountdown}
-                    durationMs={5000}
-                    players={game.players.filter(p => !p.isAI)}
-                  />
-                )}
-
-                {/* Multiplayer rematch voting status */}
-                {game.isMultiplayer && rematchVotes.length > 0 && !rematchGameId && (
-                  <div className="bg-black/30 border border-white/5 rounded-2xl p-3 mb-1">
-                    <p className="text-xs font-bold text-text-muted uppercase tracking-widest mb-2">Rematch Votes</p>
-                    <div className="flex justify-center gap-2 flex-wrap">
-                      {game.players.filter(p => !p.isAI).map(p => {
-                        const voted = rematchVotes.includes(p.id);
-                        return (
-                          <div key={p.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${voted ? 'bg-success/20 border border-success/30 text-success' : 'bg-white/5 border border-white/10 text-text-muted'}`}>
-                            <span className="text-base">{AVATARS[p.avatar]}</span>
-                            <span className="max-w-[60px] truncate">{p.name}</span>
-                            {voted && <span>&#10003;</span>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={handleRematch}
-                  disabled={rematchLoading || !!rematchGameId || (game.isMultiplayer && rematchVotes.includes(playerId))}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-accent to-[#ff8855] text-white font-black text-lg tracking-wide shadow-[0_8px_24px_rgba(255,95,46,0.4),inset_0_1px_1px_rgba(255,255,255,0.4)] border border-[#ff8d44]/50 disabled:opacity-50 min-h-[56px] relative overflow-hidden group"
-                >
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)] -skew-x-12 -translate-x-full group-hover:translate-x-full duration-1000" />
-                  {rematchLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {game.isMultiplayer ? 'Voting...' : 'Creating...'}
-                    </span>
-                  ) : rematchGameId ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Starting rematch...
-                    </span>
-                  ) : game.isMultiplayer && rematchVotes.includes(playerId) ? (
-                    'WAITING FOR OTHERS...'
-                  ) : (
-                    'REMATCH'
-                  )}
-                </motion.button>
-                <div className="flex gap-2">
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => router.push('/')}
-                    className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/90 font-bold hover:bg-white/10 transition-colors shadow-sm text-sm"
-                  >
-                    Home
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowStats(true)}
-                    className="flex-1 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/90 font-bold hover:bg-white/10 transition-colors shadow-sm text-sm"
-                  >
-                    Stats
-                  </motion.button>
-                  <button onClick={() => setShowWinner(false)} className="px-5 py-3.5 rounded-xl bg-transparent text-text-muted hover:text-white transition-colors text-sm font-bold">
-                    Board
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PostMatchSummary
+        show={showPostMatchSummary}
+        onClose={() => setShowPostMatchSummary(false)}
+        onPlayAgain={handleRematch}
+        onGoHome={() => router.push('/')}
+        isWinner={game?.winnerId === playerId}
+        matchStats={matchStats}
+        progressUpdate={progressUpdate}
+        series={game?.series}
+        playerId={playerId}
+        players={game?.players.map(p => ({ id: p.id, name: p.name, avatar: p.avatar })) || []}
+      />
 
       <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
 
@@ -1450,15 +1447,19 @@ export default function GamePage() {
       <div className="lg:hidden glass-panel border-x-0 border-t-0 rounded-none px-2 md:px-3 py-2 safe-top safe-x flex items-center gap-2 z-30">
         <div className="hidden sm:flex flex-col items-start gap-1">
           <span className="status-pill py-1 text-[10px]">Room {game.code}</span>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(game.code);
-              toast.success('Code copied');
-            }}
-            className="text-[11px] text-text-muted active:text-accent min-h-[44px] flex items-center"
-          >
-            Copy code
-          </button>
+          {game.series ? (
+            <SeriesScoreBar series={game.series} players={game.players} compact />
+          ) : (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(game.code);
+                toast.success('Code copied');
+              }}
+              className="text-[11px] text-text-muted active:text-accent min-h-[44px] flex items-center"
+            >
+              Copy code
+            </button>
+          )}
         </div>
         <div className="flex-1 overflow-x-auto scroll-touch">
           <OpponentBar
@@ -1545,6 +1546,13 @@ export default function GamePage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Series Score Bar (Desktop) */}
+          {game.series && (
+            <div className="hidden lg:flex w-full justify-center pt-2 pb-1">
+              <SeriesScoreBar series={game.series} players={game.players} />
+            </div>
+          )}
 
           {/* Opponents Row (Desktop) */}
           <div className="hidden lg:flex w-full justify-center pb-8 pt-2">

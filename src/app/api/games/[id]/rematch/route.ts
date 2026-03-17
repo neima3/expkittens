@@ -2,8 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
 import { createGame, startGame } from '@/lib/game-engine';
 import { nanoid } from 'nanoid';
+import type { SeriesState } from '@/types/game';
 
 const COUNTDOWN_MS = 5000; // 5 second countdown before rematch starts
+
+function buildNextSeriesState(
+  currentSeries: SeriesState,
+  newPlayerIdMap: Record<string, string>,
+): SeriesState {
+  // The game engine already updated scores, history, and seriesWinnerId when the game finished.
+  // Here we just remap player IDs for the new game and increment currentMatch.
+
+  const playerNames: Record<string, string> = {};
+  for (const [oldId, name] of Object.entries(currentSeries.playerNames)) {
+    const newId = newPlayerIdMap[oldId] || oldId;
+    playerNames[newId] = name;
+  }
+
+  // Remap seriesWinnerId to new player ID
+  let seriesWinnerPlayerId = currentSeries.seriesWinnerId;
+  if (seriesWinnerPlayerId && newPlayerIdMap[seriesWinnerPlayerId]) {
+    seriesWinnerPlayerId = newPlayerIdMap[seriesWinnerPlayerId];
+  }
+
+  return {
+    ...currentSeries,
+    currentMatch: currentSeries.currentMatch + 1,
+    playerNames,
+    seriesWinnerId: seriesWinnerPlayerId,
+  };
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,11 +91,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const newHostId = nanoid(12);
       newPlayerIdMap[hostPlayer.id] = newHostId;
 
+      // Build series state for the next game if this game is part of a series
+      let existingSeries: SeriesState | undefined;
+      if (game.series) {
+        existingSeries = buildNextSeriesState(game.series, newPlayerIdMap);
+      }
+
       let newGame = createGame({
         hostId: newHostId,
         hostName: hostPlayer.name,
         hostAvatar: hostPlayer.avatar,
         isMultiplayer: true,
+        existingSeries,
       });
 
       // Add other human players in original order
@@ -85,6 +120,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         });
       }
 
+      // Remap series playerNames now that we have all new IDs
+      if (newGame.series && game.series) {
+        const playerNames: Record<string, string> = {};
+        for (const [oldId, name] of Object.entries(game.series.playerNames)) {
+          const newId = newPlayerIdMap[oldId] || oldId;
+          playerNames[newId] = name;
+        }
+        newGame.series = { ...newGame.series, playerNames };
+      }
+
       // Auto-start the new game
       newGame = startGame(newGame);
       await saveGame(newGame);
@@ -99,6 +144,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         rematchGameId: newGame.id,
         playerIdMap: newPlayerIdMap,
         countdownMs: COUNTDOWN_MS,
+        series: newGame.series || null,
       });
     }
 

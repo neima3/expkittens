@@ -5,6 +5,7 @@ import type {
   GameState,
   GameAction,
   Player,
+  SeriesState,
 } from '@/types/game';
 
 function shuffle<T>(array: T[]): T[] {
@@ -76,6 +77,8 @@ export function createGame(options: {
   hostAvatar: number;
   isMultiplayer: boolean;
   aiCount?: number;
+  bestOf?: 3 | 5;
+  existingSeries?: SeriesState;
 }): GameState {
   const code = nanoid(6).toUpperCase();
   const players: Player[] = [
@@ -103,6 +106,21 @@ export function createGame(options: {
     }
   }
 
+  // Build series state if starting a new series or continuing an existing one
+  let series: SeriesState | undefined;
+  if (options.existingSeries) {
+    series = options.existingSeries;
+  } else if (options.bestOf) {
+    series = {
+      seriesId: nanoid(10),
+      bestOf: options.bestOf,
+      currentMatch: 1,
+      scores: {},
+      playerNames: {},
+      history: [],
+    };
+  }
+
   const game: GameState = {
     id: nanoid(12),
     code,
@@ -120,6 +138,7 @@ export function createGame(options: {
     isMultiplayer: options.isMultiplayer,
     hostId: options.hostId,
     lastActionId: 0,
+    series,
   };
 
   return game;
@@ -136,6 +155,27 @@ export function startGame(game: GameState): GameState {
     hand: playerHands[i],
   }));
 
+  // Initialize series scores/names for all players on first match
+  let series = game.series;
+  if (series && series.currentMatch === 1) {
+    const scores: Record<string, number> = {};
+    const playerNames: Record<string, string> = {};
+    for (const p of players) {
+      scores[p.name] = 0;
+      playerNames[p.id] = p.name;
+    }
+    series = { ...series, scores, playerNames };
+  }
+
+  const startLogs = [{ message: 'Game started!', timestamp: Date.now() }];
+  if (series) {
+    const winsNeeded = Math.ceil(series.bestOf / 2);
+    startLogs.push({
+      message: `Series Match ${series.currentMatch} of ${series.bestOf} (First to ${winsNeeded} wins)`,
+      timestamp: Date.now(),
+    });
+  }
+
   return {
     ...game,
     status: 'playing',
@@ -144,9 +184,10 @@ export function startGame(game: GameState): GameState {
     discardPile: [],
     currentPlayerIndex: 0,
     turnsRemaining: 1,
-    logs: [{ message: 'Game started!', timestamp: Date.now() }],
+    logs: startLogs,
     updatedAt: Date.now(),
     lastActionId: game.lastActionId + 1,
+    series,
   };
 }
 
@@ -395,6 +436,28 @@ export function processAction(game: GameState, action: GameAction): GameState {
             state.winnerId = alivePlayers[0].id;
             state.status = 'finished';
             state.logs.push({ message: `🏆 ${alivePlayers[0].name} wins!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
+
+            // Update series state
+            if (state.series) {
+              const winnerName = alivePlayers[0].name;
+              const scores = { ...state.series.scores };
+              scores[winnerName] = (scores[winnerName] || 0) + 1;
+              const winsNeeded = Math.ceil(state.series.bestOf / 2);
+              const history = [...state.series.history, {
+                gameId: state.id,
+                winnerId: alivePlayers[0].id,
+                winnerName,
+                matchNumber: state.series.currentMatch,
+              }];
+              const seriesWinnerId = scores[winnerName] >= winsNeeded ? alivePlayers[0].id : undefined;
+              state.series = { ...state.series, scores, history, seriesWinnerId };
+
+              if (seriesWinnerId) {
+                state.logs.push({ message: `👑 ${winnerName} wins the series!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
+              } else {
+                state.logs.push({ message: `Series: Match ${state.series.currentMatch} of ${state.series.bestOf} complete`, timestamp: Date.now() });
+              }
+            }
           } else {
             // Move to next player
             state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);

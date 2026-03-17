@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     void maybeCleanupOldGames();
 
     const body = await req.json();
-    const { playerName, avatar = 0, mode, aiCount = 1 } = body;
+    const { playerName, avatar = 0, mode, aiCount = 1, bestOf } = body;
 
     if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
@@ -18,12 +18,15 @@ export async function POST(req: NextRequest) {
     const playerId = nanoid(12);
     const isMultiplayer = mode === 'multiplayer';
 
+    const validBestOf = bestOf === 3 || bestOf === 5 ? bestOf : undefined;
+
     let game = createGame({
       hostId: playerId,
       hostName: playerName.slice(0, 20),
       hostAvatar: avatar,
       isMultiplayer,
       aiCount: isMultiplayer ? 0 : Math.min(Math.max(1, aiCount), 4),
+      bestOf: validBestOf,
     });
 
     if (!isMultiplayer) {
