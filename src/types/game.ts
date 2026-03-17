@@ -20,6 +20,8 @@ export interface Card {
 
 export type GameStatus = 'waiting' | 'playing' | 'finished';
 
+export type AIDifficulty = 'easy' | 'normal' | 'hard' | 'ruthless';
+
 export interface Player {
   id: string;
   name: string;
@@ -27,6 +29,7 @@ export interface Player {
   isAlive: boolean;
   isAI: boolean;
   avatar: number; // 0-7 avatar index
+  difficulty?: AIDifficulty; // AI difficulty tier
 }
 
 export interface GameAction {
@@ -198,3 +201,10 @@ export const CAT_CARD_TYPES: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat
 export const ACTION_CARD_TYPES: CardType[] = ['attack', 'skip', 'favor', 'shuffle', 'see_the_future', 'nope'];
 
 export const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'] as const;
+
+export const AI_DIFFICULTY_INFO: Record<AIDifficulty, { label: string; emoji: string; color: string; description: string }> = {
+  easy: { label: 'Easy', emoji: '😺', color: '#4ade80', description: 'Random play, never targets you' },
+  normal: { label: 'Normal', emoji: '😼', color: '#38bdf8', description: 'Basic strategy, occasional targeting' },
+  hard: { label: 'Hard', emoji: '😾', color: '#f97316', description: 'Optimal combos, bluff-aware' },
+  ruthless: { label: 'Ruthless', emoji: '🙀', color: '#ef4444', description: 'Card counting, aggressive targeting' },
+};

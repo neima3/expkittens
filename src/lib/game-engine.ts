@@ -6,6 +6,7 @@ import type {
   GameAction,
   Player,
   SeriesState,
+  AIDifficulty,
 } from '@/types/game';
 
 function shuffle<T>(array: T[]): T[] {
@@ -77,6 +78,7 @@ export function createGame(options: {
   hostAvatar: number;
   isMultiplayer: boolean;
   aiCount?: number;
+  aiDifficulty?: AIDifficulty;
   bestOf?: 3 | 5;
   existingSeries?: SeriesState;
 }): GameState {
@@ -93,7 +95,14 @@ export function createGame(options: {
   ];
 
   if (!options.isMultiplayer && options.aiCount) {
-    const aiNames = ['Whiskers', 'Mittens', 'Shadow', 'Patches'];
+    const aiNamesByDifficulty: Record<AIDifficulty, string[]> = {
+      easy: ['Fluffy', 'Bubbles', 'Snuggles', 'Cupcake'],
+      normal: ['Whiskers', 'Mittens', 'Shadow', 'Patches'],
+      hard: ['Razor', 'Viper', 'Storm', 'Blaze'],
+      ruthless: ['Reaper', 'Chaos', 'Doom', 'Havoc'],
+    };
+    const diff = options.aiDifficulty || 'normal';
+    const aiNames = aiNamesByDifficulty[diff];
     for (let i = 0; i < options.aiCount; i++) {
       players.push({
         id: `ai_${nanoid(6)}`,
@@ -102,6 +111,7 @@ export function createGame(options: {
         isAlive: true,
         isAI: true,
         avatar: i + 1,
+        difficulty: diff,
       });
     }
   }

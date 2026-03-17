@@ -909,7 +909,9 @@ export default function GamePage() {
       const savedName = localStorage.getItem('ek_playerName') || myPlayer?.name || 'Player';
       const savedAvatar = localStorage.getItem('ek_avatar');
       const avatarIdx = savedAvatar ? parseInt(savedAvatar) : (myPlayer?.avatar || 0);
-      const aiPlayerCount = game.players.filter(p => p.isAI).length;
+      const aiPlayers = game.players.filter(p => p.isAI);
+      const aiPlayerCount = aiPlayers.length;
+      const aiDiff = aiPlayers[0]?.difficulty;
 
       const res = await fetch('/api/games', {
         method: 'POST',
@@ -919,6 +921,7 @@ export default function GamePage() {
           avatar: avatarIdx,
           mode: 'single',
           aiCount: aiPlayerCount,
+          aiDifficulty: aiDiff,
           bestOf: game.series?.bestOf,
         }),
       });

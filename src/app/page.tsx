@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { toast } from 'sonner';
 import { getStats, getRankInfo, getAchievements, getLevelInfo } from '@/lib/stats';
-import { AVATARS } from '@/types/game';
+import { AVATARS, AI_DIFFICULTY_INFO } from '@/types/game';
+import type { AIDifficulty } from '@/types/game';
 
 const FLOATING_TOKENS = [
   { symbol: '💣', top: '10%', left: '8%', delay: 0, duration: 15 },
@@ -30,6 +31,7 @@ function HomeContent() {
   const [avatar, setAvatar] = useState(0);
   const [mode, setMode] = useState<'ai' | 'multiplayer'>('ai');
   const [aiCount, setAiCount] = useState(1);
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('normal');
   const [bestOf, setBestOf] = useState<0 | 3 | 5>(0); // 0 = single match
   const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
@@ -75,6 +77,7 @@ function HomeContent() {
           avatar,
           mode: mode === 'ai' ? 'single' : 'multiplayer',
           aiCount,
+          aiDifficulty: mode === 'ai' ? aiDifficulty : undefined,
           bestOf: bestOf || undefined,
         }),
       });
@@ -328,26 +331,64 @@ function HomeContent() {
               </div>
 
               {mode === 'ai' && (
-                <div className="mb-10">
-                  <label className="text-sm lg:text-base font-bold text-text-muted mb-3 block uppercase tracking-wider">Opponents</label>
-                  <div className="grid grid-cols-4 gap-3 lg:gap-4">
-                    {[1, 2, 3, 4].map(n => (
-                      <motion.button
-                        key={n}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.96 }}
-                        onClick={() => setAiCount(n)}
-                        className={`py-4 rounded-2xl font-bold text-xl transition-all ${
-                          aiCount === n
-                            ? 'cta-primary shadow-lg'
-                            : 'bg-surface-light/70 text-text-muted hover:text-text border-2 border-border hover:border-text-muted/50'
-                        }`}
-                      >
-                        {n}
-                      </motion.button>
-                    ))}
+                <>
+                  <div className="mb-8">
+                    <label className="text-sm lg:text-base font-bold text-text-muted mb-3 block uppercase tracking-wider">Opponents</label>
+                    <div className="grid grid-cols-4 gap-3 lg:gap-4">
+                      {[1, 2, 3, 4].map(n => (
+                        <motion.button
+                          key={n}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.96 }}
+                          onClick={() => setAiCount(n)}
+                          className={`py-4 rounded-2xl font-bold text-xl transition-all ${
+                            aiCount === n
+                              ? 'cta-primary shadow-lg'
+                              : 'bg-surface-light/70 text-text-muted hover:text-text border-2 border-border hover:border-text-muted/50'
+                          }`}
+                        >
+                          {n}
+                        </motion.button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  <div className="mb-10">
+                    <label className="text-sm lg:text-base font-bold text-text-muted mb-3 block uppercase tracking-wider">AI Difficulty</label>
+                    <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                      {(Object.keys(AI_DIFFICULTY_INFO) as AIDifficulty[]).map(diff => {
+                        const info = AI_DIFFICULTY_INFO[diff];
+                        const isSelected = aiDifficulty === diff;
+                        return (
+                          <motion.button
+                            key={diff}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => setAiDifficulty(diff)}
+                            className={`py-3 px-4 rounded-2xl font-bold text-left transition-all ${
+                              isSelected
+                                ? 'shadow-lg border-2'
+                                : 'bg-surface-light/70 text-text-muted hover:text-text border-2 border-border hover:border-text-muted/50'
+                            }`}
+                            style={isSelected ? {
+                              borderColor: info.color,
+                              backgroundColor: `${info.color}15`,
+                              boxShadow: `0 0 20px ${info.color}30`,
+                            } : undefined}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xl">{info.emoji}</span>
+                              <span className="text-sm font-black uppercase tracking-wider" style={isSelected ? { color: info.color } : undefined}>
+                                {info.label}
+                              </span>
+                            </div>
+                            <p className="text-[11px] opacity-70 leading-tight">{info.description}</p>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="mb-10">

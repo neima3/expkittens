@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { motion } from 'framer-motion';
-import { AVATARS } from '@/types/game';
+import { AVATARS, AI_DIFFICULTY_INFO } from '@/types/game';
 import type { Player } from '@/types/game';
 
 interface OpponentBarProps {
@@ -57,7 +57,19 @@ export default memo(function OpponentBar({
             <div className="text-left relative z-10 pr-2">
               <div className={`text-[13px] font-black tracking-wide leading-none mb-1 text-white/95 ${!player.isAlive ? 'line-through text-danger/80' : ''}`}>
                 {player.name}
-                {player.isAI && <span className="text-text-muted text-[10px] ml-1.5 opacity-70">🤖</span>}
+                {player.isAI && player.difficulty && (
+                  <span
+                    className="text-[9px] ml-1.5 font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full inline-block align-middle"
+                    style={{
+                      color: AI_DIFFICULTY_INFO[player.difficulty].color,
+                      backgroundColor: `${AI_DIFFICULTY_INFO[player.difficulty].color}20`,
+                      border: `1px solid ${AI_DIFFICULTY_INFO[player.difficulty].color}40`,
+                    }}
+                  >
+                    {AI_DIFFICULTY_INFO[player.difficulty].label}
+                  </span>
+                )}
+                {player.isAI && !player.difficulty && <span className="text-text-muted text-[10px] ml-1.5 opacity-70">🤖</span>}
               </div>
               <div className="flex items-center gap-1.5">
                 {player.isAlive ? (
