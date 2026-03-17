@@ -26,6 +26,7 @@ export default function GameLog({ logs, maxVisible = 50 }: GameLogProps) {
     >
       <AnimatePresence initial={false}>
         {visible.map((log, i) => {
+          const isChat = log.type === 'chat' || log.type === 'preset';
           const time = new Date(log.timestamp);
           const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           return (
@@ -33,12 +34,22 @@ export default function GameLog({ logs, maxVisible = 50 }: GameLogProps) {
               key={`${log.timestamp}-${i}`}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              className={`text-text-muted flex items-start gap-2 px-2 py-0.5 rounded ${
-                i % 2 === 0 ? 'bg-surface-light/30' : ''
+              className={`flex items-start gap-2 px-2 py-0.5 rounded ${
+                isChat
+                  ? 'bg-accent/10 border-l-2 border-accent/40'
+                  : i % 2 === 0 ? 'bg-surface-light/30' : ''
               }`}
             >
               <span className="text-[10px] text-text-muted/50 shrink-0 mt-0.5 font-mono">{timeStr}</span>
-              <span>{log.message}</span>
+              {isChat ? (
+                <span className="text-text">
+                  <span className="font-bold text-accent/80">{log.playerName || 'Player'}</span>
+                  <span className="text-text-muted/50 mx-1">:</span>
+                  <span className={log.type === 'preset' ? 'italic text-text/80' : ''}>{log.message}</span>
+                </span>
+              ) : (
+                <span className="text-text-muted">{log.message}</span>
+              )}
             </motion.div>
           );
         })}

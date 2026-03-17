@@ -16,6 +16,7 @@ import ThreeOfKindModal from '@/components/game/ThreeOfKindModal';
 import DangerMeter from '@/components/game/DangerMeter';
 import SoundToggle from '@/components/game/SoundToggle';
 import QuickEmotes from '@/components/game/QuickEmotes';
+import ChatPanel from '@/components/game/ChatPanel';
 import StatsDisplay from '@/components/game/StatsDisplay';
 import PostMatchSummary from '@/components/game/PostMatchSummary';
 import ComboCoach from '@/components/game/ComboCoach';
@@ -1484,6 +1485,7 @@ export default function GamePage() {
           </button>
           <SoundToggle />
           <QuickEmotes onEmote={handleEmote} />
+          {game.isMultiplayer && <ChatPanel gameId={gameId} playerId={playerId} disabled={!myPlayer?.isAlive} />}
         </div>
       </div>
 
@@ -1715,6 +1717,11 @@ export default function GamePage() {
                 <QuickEmotes onEmote={handleEmote} />
               </div>
             </div>
+            {game.isMultiplayer && (
+              <div className="flex justify-center py-2 bg-surface-light border border-border rounded-xl">
+                <ChatPanel gameId={gameId} playerId={playerId} disabled={!myPlayer?.isAlive} />
+              </div>
+            )}
           </div>
         </div>
       </div>

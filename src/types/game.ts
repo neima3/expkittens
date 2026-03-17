@@ -69,10 +69,14 @@ export interface SeriesState {
   seriesWinnerId?: string; // set when series is decided
 }
 
+export type GameLogType = 'system' | 'chat' | 'preset';
+
 export interface GameLog {
   message: string;
   timestamp: number;
   playerId?: string;
+  type?: GameLogType; // undefined = system (backwards compatible)
+  playerName?: string; // for chat messages
 }
 
 export interface GameState {
