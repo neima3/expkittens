@@ -1,5 +1,10 @@
 'use client';
 
+export interface GameResult {
+  timestamp: number;
+  won: boolean;
+}
+
 export interface GameStats {
   gamesPlayed: number;
   wins: number;
@@ -8,6 +13,10 @@ export interface GameStats {
   cardsPlayed: number;
   cardsStolen: number;
   defusesUsed: number;
+  nopesPlayed: number;
+  attacksPlayed: number;
+  cardTypeCounts: Record<string, number>;
+  gameHistory: GameResult[];
   winStreak: number;
   bestWinStreak: number;
   xp: number;
@@ -79,6 +88,8 @@ export function recordWin(): ProgressUpdate {
     if (stats.winStreak > stats.bestWinStreak) {
       stats.bestWinStreak = stats.winStreak;
     }
+    if (!stats.gameHistory) stats.gameHistory = [];
+    stats.gameHistory.push({ timestamp: Date.now(), won: true });
     const streakBonus = Math.min(60, Math.max(0, stats.winStreak - 1) * 8);
     return 120 + streakBonus;
   });
@@ -89,6 +100,8 @@ export function recordLoss(): ProgressUpdate {
     stats.gamesPlayed++;
     stats.losses++;
     stats.winStreak = 0;
+    if (!stats.gameHistory) stats.gameHistory = [];
+    stats.gameHistory.push({ timestamp: Date.now(), won: false });
     return 35;
   });
 }
@@ -121,6 +134,30 @@ export function recordDefuseUsed(count = 1): ProgressUpdate {
     stats.defusesUsed += used;
     return used * 20;
   });
+}
+
+export function recordCardTypePlayed(cardType: string): void {
+  if (typeof window === 'undefined') return;
+  const stats = getStats();
+  if (!stats.cardTypeCounts) stats.cardTypeCounts = {};
+  stats.cardTypeCounts[cardType] = (stats.cardTypeCounts[cardType] || 0) + 1;
+  if (cardType === 'nope') stats.nopesPlayed = (stats.nopesPlayed || 0) + 1;
+  if (cardType === 'attack') stats.attacksPlayed = (stats.attacksPlayed || 0) + 1;
+  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
+export function getFavoriteCardType(stats: GameStats): { type: string; count: number } | null {
+  const counts = stats.cardTypeCounts || {};
+  let best: { type: string; count: number } | null = null;
+  for (const [type, count] of Object.entries(counts)) {
+    if (!best || count > best.count) best = { type, count };
+  }
+  return best;
+}
+
+export function resetStats(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STATS_KEY, JSON.stringify(defaultStats()));
 }
 
 export function getRankInfo(stats: GameStats): RankInfo {
@@ -167,7 +204,8 @@ export function getRankInfo(stats: GameStats): RankInfo {
 }
 
 export function getAchievements(stats: GameStats): Achievement[] {
-  const defs: Array<Omit<Achievement, 'unlocked' | 'progress'> & { metric: keyof GameStats }> = [
+  type NumericStatKey = { [K in keyof GameStats]: GameStats[K] extends number ? K : never }[keyof GameStats];
+  const defs: Array<Omit<Achievement, 'unlocked' | 'progress'> & { metric: NumericStatKey }> = [
     {
       id: 'first-win',
       emoji: '🏆',
@@ -291,6 +329,10 @@ function defaultStats(): GameStats {
     cardsPlayed: 0,
     cardsStolen: 0,
     defusesUsed: 0,
+    nopesPlayed: 0,
+    attacksPlayed: 0,
+    cardTypeCounts: {},
+    gameHistory: [],
     winStreak: 0,
     bestWinStreak: 0,
     xp: 0,

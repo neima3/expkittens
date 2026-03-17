@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { toast } from 'sonner';
-import StatsDisplay from '@/components/game/StatsDisplay';
 import { getStats, getRankInfo, getAchievements, getLevelInfo } from '@/lib/stats';
 import { AVATARS } from '@/types/game';
 
@@ -34,7 +33,6 @@ function HomeContent() {
   const [bestOf, setBestOf] = useState<0 | 3 | 5>(0); // 0 = single match
   const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
-  const [showStats, setShowStats] = useState(false);
   const [quickStats, setQuickStats] = useState({ gamesPlayed: 0, wins: 0, winStreak: 0 });
   const [rankTitle, setRankTitle] = useState('Rookie Spark');
   const [levelNumber, setLevelNumber] = useState(1);
@@ -261,9 +259,9 @@ function HomeContent() {
                 </div>
 
                 <div className="mt-8 lg:mt-10 flex items-center justify-center gap-6 text-sm lg:text-base">
-                  <button onClick={() => setShowStats(true)} className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
+                  <Link href="/stats" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     View Stats
-                  </button>
+                  </Link>
                   <span className="text-border/50">•</span>
                   <Link href="/rules" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     How to Play
@@ -485,7 +483,6 @@ function HomeContent() {
         </AnimatePresence>
       </div>
 
-      <StatsDisplay show={showStats} onClose={() => setShowStats(false)} />
     </div>
   );
 }
