@@ -51,6 +51,113 @@ function findPairs(hand: Card[]): [Card, Card][] {
   return pairs;
 }
 
+/**
+ * Score a potential steal target based on game state.
+ * Higher score = more attractive target.
+ */
+function scoreStealTarget(game: GameState, aiPlayer: Player, target: Player): number {
+  let score = 0;
+  const deckSize = game.deck.length;
+  const alivePlayers = game.players.filter(p => p.isAlive).length;
+  const dangerLevel = deckSize > 0 ? (alivePlayers - 1) / deckSize : 1;
+  const aiHasDefuse = aiPlayer.hand.some(c => c.type === 'defuse');
+
+  // More cards = higher chance of stealing something useful
+  score += target.hand.length * 2;
+
+  // Target the next player in turn order (they're about to draw)
+  const currentIdx = game.players.findIndex(p => p.id === aiPlayer.id);
+  const nextAliveIdx = getNextAliveIndex(game, aiPlayer.id);
+  if (nextAliveIdx !== -1 && game.players[nextAliveIdx].id === target.id) {
+    score += 5; // Weakening the next player is strategic
+  }
+
+  // If danger is high and target likely has a defuse (many cards), prioritize them
+  if (dangerLevel > 0.3 && !aiHasDefuse && target.hand.length >= 4) {
+    score += 8; // They probably have defuse — steal it
+  }
+
+  // Penalize targeting players who are already weak (few cards)
+  if (target.hand.length <= 2) {
+    score -= 3;
+  }
+
+  // In heads-up, always target the only opponent
+  if (alivePlayers === 2) {
+    score += 10;
+  }
+
+  // Slight randomization to avoid being predictable
+  score += Math.random() * 3;
+
+  return score;
+}
+
+function pickStealTarget(game: GameState, aiPlayer: Player, targets: Player[]): Player {
+  if (targets.length === 1) return targets[0];
+  return targets.reduce((best, t) => {
+    const bestScore = scoreStealTarget(game, aiPlayer, best);
+    const tScore = scoreStealTarget(game, aiPlayer, t);
+    return tScore > bestScore ? t : best;
+  });
+}
+
+/**
+ * Pick which card type to request with three-of-a-kind based on game state.
+ */
+function pickThreeOfKindCardType(game: GameState, aiPlayer: Player, target: Player): CardType {
+  const aiHasDefuse = aiPlayer.hand.some(c => c.type === 'defuse');
+  const deckSize = game.deck.length;
+  const alivePlayers = game.players.filter(p => p.isAlive).length;
+  const dangerLevel = deckSize > 0 ? (alivePlayers - 1) / deckSize : 1;
+
+  // Build weighted priorities based on game state
+  const weights: [CardType, number][] = [];
+
+  // Defuse: steal if we don't have one and danger is moderate+, or endgame
+  if (!aiHasDefuse && dangerLevel > 0.15) {
+    weights.push(['defuse', 20 + dangerLevel * 30]);
+  } else if (!aiHasDefuse) {
+    weights.push(['defuse', 10]);
+  } else {
+    // We already have defuse — steal it to deny the opponent
+    if (alivePlayers <= 3 && target.hand.length >= 3) {
+      weights.push(['defuse', 12]); // Deny defuse in late game
+    } else {
+      weights.push(['defuse', 3]); // Low priority — we already have one
+    }
+  }
+
+  // Attack: valuable for turn avoidance
+  weights.push(['attack', dangerLevel > 0.25 ? 15 : 8]);
+
+  // Nope: valuable defensive card
+  const aiNopeCount = aiPlayer.hand.filter(c => c.type === 'nope').length;
+  weights.push(['nope', aiNopeCount === 0 ? 12 : 5]);
+
+  // Skip: good for turn avoidance
+  weights.push(['skip', dangerLevel > 0.2 ? 10 : 5]);
+
+  // See the Future: good info card
+  weights.push(['see_the_future', dangerLevel > 0.2 ? 8 : 4]);
+
+  // Shuffle: situation-dependent
+  weights.push(['shuffle', dangerLevel > 0.3 ? 7 : 3]);
+
+  // Favor: steal to play later
+  weights.push(['favor', 4]);
+
+  // Weighted random selection
+  const totalWeight = weights.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * totalWeight;
+  for (const [cardType, weight] of weights) {
+    roll -= weight;
+    if (roll <= 0) return cardType;
+  }
+
+  return weights[0][0]; // fallback
+}
+
 export function getAIAction(game: GameState, aiPlayer: Player): GameAction | null {
   if (!aiPlayer.isAlive) return null;
 
@@ -111,7 +218,7 @@ export function getAIAction(game: GameState, aiPlayer: Player): GameAction | nul
     if (game.pendingAction.type === 'steal_target' && game.pendingAction.playerId === aiPlayer.id) {
       const targets = game.players.filter(p => p.isAlive && p.id !== aiPlayer.id && p.hand.length > 0);
       if (targets.length > 0) {
-        const target = targets.reduce((a, b) => a.hand.length > b.hand.length ? a : b);
+        const target = pickStealTarget(game, aiPlayer, targets);
         return {
           type: 'steal_target',
           playerId: aiPlayer.id,
@@ -123,13 +230,8 @@ export function getAIAction(game: GameState, aiPlayer: Player): GameAction | nul
     if (game.pendingAction.type === 'three_of_kind_target' && game.pendingAction.playerId === aiPlayer.id) {
       const targets = game.players.filter(p => p.isAlive && p.id !== aiPlayer.id && p.hand.length > 0);
       if (targets.length > 0) {
-        const target = targets.reduce((a, b) => a.hand.length > b.hand.length ? a : b);
-        // Prioritize defuse, then high-value cards, with some randomization
-        const hasDefuse = hand.some(c => c.type === 'defuse');
-        const stealPriority: CardType[] = hasDefuse
-          ? ['attack', 'see_the_future', 'skip', 'nope', 'shuffle', 'defuse']
-          : ['defuse', 'attack', 'see_the_future', 'skip', 'nope', 'shuffle'];
-        const targetCardType = stealPriority[Math.floor(Math.random() * Math.min(3, stealPriority.length))];
+        const target = pickStealTarget(game, aiPlayer, targets);
+        const targetCardType = pickThreeOfKindCardType(game, aiPlayer, target);
         return {
           type: 'three_of_kind_target',
           playerId: aiPlayer.id,
