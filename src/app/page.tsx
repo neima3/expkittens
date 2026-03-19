@@ -69,25 +69,42 @@ function HomeContent() {
     }
     setLoading(true);
     try {
-      const res = await fetch('/api/games', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          playerName: playerName.trim(),
-          avatar,
-          mode: mode === 'ai' ? 'single' : 'multiplayer',
-          aiCount,
-          aiDifficulty: mode === 'ai' ? aiDifficulty : undefined,
-          bestOf: bestOf || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (mode === 'multiplayer') {
+        // Multiplayer → create a pre-game lobby room
+        const res = await fetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerName: playerName.trim(), avatar }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
 
-      localStorage.setItem(`ek_player_${data.gameId}`, data.playerId);
-      localStorage.setItem('ek_playerName', playerName.trim());
-      localStorage.setItem('ek_avatar', String(avatar));
-      router.push(`/game/${data.gameId}`);
+        localStorage.setItem(`ek_room_${data.code}`, data.playerId);
+        localStorage.setItem('ek_playerName', playerName.trim());
+        localStorage.setItem('ek_avatar', String(avatar));
+        router.push(`/lobby/${data.code}`);
+      } else {
+        // Single-player vs AI — start immediately
+        const res = await fetch('/api/games', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerName: playerName.trim(),
+            avatar,
+            mode: 'single',
+            aiCount,
+            aiDifficulty,
+            bestOf: bestOf || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        localStorage.setItem(`ek_player_${data.gameId}`, data.playerId);
+        localStorage.setItem('ek_playerName', playerName.trim());
+        localStorage.setItem('ek_avatar', String(avatar));
+        router.push(`/game/${data.gameId}`);
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to create game');
     } finally {
@@ -95,34 +112,19 @@ function HomeContent() {
     }
   }
 
-  async function joinGame() {
-    if (!playerName.trim() || !joinCode.trim()) {
-      toast.error('Enter your name and game code');
+  function joinGame() {
+    // Navigate to the lobby room — player will join from there
+    const code = joinCode.trim().toUpperCase();
+    if (!code) {
+      toast.error('Enter a room code');
       return;
     }
-    setLoading(true);
-    try {
-      const res = await fetch('/api/games/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: joinCode.trim().toUpperCase(),
-          playerName: playerName.trim(),
-          avatar,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      localStorage.setItem(`ek_player_${data.gameId}`, data.playerId);
+    // Save name/avatar for pre-fill on lobby page
+    if (playerName.trim()) {
       localStorage.setItem('ek_playerName', playerName.trim());
       localStorage.setItem('ek_avatar', String(avatar));
-      router.push(`/game/${data.gameId}`);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to join game');
-    } finally {
-      setLoading(false);
     }
+    router.push(`/lobby/${code}`);
   }
 
   return (
@@ -201,10 +203,7 @@ function HomeContent() {
                     id="start-friends-btn"
                     whileHover={{ scale: 1.03, boxShadow: "0 20px 40px rgba(255,95,46,0.4)" }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => {
-                      setMode('multiplayer');
-                      setScreen('setup');
-                    }}
+                    onClick={() => router.push('/lobby')}
                     className="cta-primary w-full py-4 lg:py-6 px-6 text-base md:text-xl lg:text-2xl rounded-2xl"
                   >
                     🎉 Start Friend Lobby
@@ -227,7 +226,7 @@ function HomeContent() {
                     id="join-code-btn"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => setScreen('join')}
+                    onClick={() => router.push('/lobby?tab=join')}
                     className="cta-ghost w-full py-4 lg:py-6 px-6 text-base md:text-xl lg:text-2xl rounded-2xl"
                   >
                     🔗 Join with Room Code
