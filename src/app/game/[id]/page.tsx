@@ -1283,6 +1283,7 @@ export default function GamePage() {
         onPlayAgain={handleRematch}
         onGoHome={() => router.push('/')}
         isWinner={game?.winnerId === playerId}
+        gameId={gameId}
         matchStats={matchStats}
         progressUpdate={progressUpdate}
         series={game?.series}

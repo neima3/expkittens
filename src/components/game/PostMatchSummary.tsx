@@ -13,6 +13,7 @@ interface PostMatchSummaryProps {
   onPlayAgain: () => void;
   onGoHome: () => void;
   isWinner: boolean;
+  gameId?: string;
   matchStats?: {
     cardsDrawn: number;
     defusesUsed: number;
@@ -37,6 +38,7 @@ export default function PostMatchSummary({
   onPlayAgain,
   onGoHome,
   isWinner,
+  gameId,
   matchStats = { cardsDrawn: 0, defusesUsed: 0, opponentsEliminated: 0 },
   progressUpdate,
   series,
@@ -47,6 +49,9 @@ export default function PostMatchSummary({
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([]);
   const [showXpAnimation, setShowXpAnimation] = useState(false);
   const [xpAnimated, setXpAnimated] = useState(0);
+  const [replayShareId, setReplayShareId] = useState<string | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayCopied, setReplayCopied] = useState(false);
 
   useEffect(() => {
     if (show) {
@@ -89,6 +94,36 @@ export default function PostMatchSummary({
       }
     }
   }, [show, progressUpdate]);
+
+  const shareReplay = useCallback(async () => {
+    if (!gameId || replayLoading) return;
+    if (replayShareId) {
+      // Already created — just copy
+      const url = `${window.location.origin}/replay/${replayShareId}`;
+      navigator.clipboard.writeText(url).then(() => {
+        setReplayCopied(true);
+        setTimeout(() => setReplayCopied(false), 2000);
+      });
+      return;
+    }
+    setReplayLoading(true);
+    try {
+      const res = await fetch(`/api/games/${gameId}/share-replay`, { method: 'POST' });
+      const data = await res.json();
+      if (data.shareId) {
+        setReplayShareId(data.shareId);
+        const url = `${window.location.origin}/replay/${data.shareId}`;
+        navigator.clipboard.writeText(url).then(() => {
+          setReplayCopied(true);
+          setTimeout(() => setReplayCopied(false), 2000);
+        });
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setReplayLoading(false);
+    }
+  }, [gameId, replayShareId, replayLoading]);
 
   if (!stats) return null;
 
@@ -485,6 +520,26 @@ export default function PostMatchSummary({
                   Close
                 </motion.button>
               </div>
+
+              {gameId && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={shareReplay}
+                  disabled={replayLoading}
+                  className="w-full py-3 rounded-xl bg-[#6366f1]/20 border border-[#6366f1]/40 text-[#a5b4fc] font-bold text-sm hover:bg-[#6366f1]/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {replayLoading ? (
+                    <><span className="w-3.5 h-3.5 border-2 border-[#a5b4fc] border-t-transparent rounded-full animate-spin" /> Creating link...</>
+                  ) : replayCopied ? (
+                    <>✓ Replay link copied!</>
+                  ) : replayShareId ? (
+                    <>🔗 Copy Replay Link</>
+                  ) : (
+                    <>🎬 Share Replay</>
+                  )}
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         </motion.div>
