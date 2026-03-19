@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getStats, getRankInfo, getAchievements, getLevelInfo } from '@/lib/stats';
 import { AVATARS, AI_DIFFICULTY_INFO } from '@/types/game';
 import type { AIDifficulty } from '@/types/game';
+import ThemeSwitcher from '@/components/game/ThemeSwitcher';
 
 const FLOATING_TOKENS = [
   { symbol: '💣', top: '10%', left: '8%', delay: 0, duration: 15 },
@@ -43,6 +44,7 @@ function HomeContent() {
   const [nextUnlock, setNextUnlock] = useState<string | null>(null);
 
   const [showTutorialPrompt, setShowTutorialPrompt] = useState(false);
+  const [showThemeSwitcher, setShowThemeSwitcher] = useState(false);
 
   useEffect(() => {
     const savedName = localStorage.getItem('ek_playerName');
@@ -313,7 +315,7 @@ function HomeContent() {
                   )}
                 </AnimatePresence>
 
-                <div className="mt-6 lg:mt-8 flex items-center justify-center gap-6 text-sm lg:text-base">
+                <div className="mt-6 lg:mt-8 flex items-center justify-center gap-4 text-sm lg:text-base flex-wrap">
                   <Link href="/stats" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     View Stats
                   </Link>
@@ -325,6 +327,13 @@ function HomeContent() {
                   <Link href="/cards" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     Card Guide
                   </Link>
+                  <span className="text-border/50">•</span>
+                  <button
+                    onClick={() => setShowThemeSwitcher(true)}
+                    className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium flex items-center gap-1"
+                  >
+                    🎨 Themes
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -580,6 +589,7 @@ function HomeContent() {
         </AnimatePresence>
       </div>
 
+      <ThemeSwitcher open={showThemeSwitcher} onClose={() => setShowThemeSwitcher(false)} />
     </div>
   );
 }

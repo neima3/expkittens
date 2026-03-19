@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Bungee, Space_Grotesk } from 'next/font/google';
 import { Toaster } from 'sonner';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { THEME_VARIABLE_MAP, DEFAULT_THEME_ID } from '@/lib/themes';
 import './globals.css';
 
 const bodyFont = Space_Grotesk({
@@ -38,11 +40,20 @@ export const viewport: Viewport = {
   themeColor: '#110f1d',
 };
 
+// Inline script to apply the saved theme before first paint (prevents flash)
+const antiFlashScript = `(function(){try{var id=localStorage.getItem('ek_theme')||'${DEFAULT_THEME_ID}';var m=${JSON.stringify(THEME_VARIABLE_MAP)};var v=m[id]||m['${DEFAULT_THEME_ID}'];var r=document.documentElement;for(var k in v){r.style.setProperty(k,v[k]);}}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: intentional anti-flash theme script */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: antiFlashScript }} />
+      </head>
       <body className={`${bodyFont.variable} ${displayFont.variable} font-[family-name:var(--font-game)] antialiased`}>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
         <Toaster
           position="top-center"
           toastOptions={{

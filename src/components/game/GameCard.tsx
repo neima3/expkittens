@@ -4,6 +4,8 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import type { Card, CardType } from '@/types/game';
 import { CARD_INFO } from '@/types/game';
+import { CardIllustration } from './CardIllustrations';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface GameCardProps {
   card: Card;
@@ -69,6 +71,7 @@ export default memo(function GameCard({
   const s = sizeMap[size];
   const info = CARD_INFO[card.type];
   const style = getCardStyle(card.type);
+  const { theme, customCardBack } = useTheme();
 
   if (faceDown || card.id === 'hidden') {
     return (
@@ -78,13 +81,22 @@ export default memo(function GameCard({
         transition={{ delay: index * 0.05 }}
         className={`${s.w} ${s.h} ${s.r} flex items-center justify-center shadow-xl flex-shrink-0 relative overflow-hidden`}
         style={{
-          background: 'linear-gradient(155deg, #1f183b 0%, #0d0a1b 100%)',
+          background: customCardBack ? undefined : theme.cardBack.background,
+          backgroundImage: customCardBack ? `url(${customCardBack})` : undefined,
+          backgroundSize: customCardBack ? 'cover' : undefined,
+          backgroundPosition: customCardBack ? 'center' : undefined,
           boxShadow: '0 8px 16px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
-          border: '1px solid #3b2d5c'
+          border: `1px solid ${theme.cardBack.border}`,
         }}
       >
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 12 12\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h12v12H0V0zm6 6h6v6H6V6zM0 6h6v6H0V6zm6-6h6v6H6V0z\' fill=\'%23ffffff\' fill-opacity=\'0.02\' fill-rule=\'evenodd\'/%3E%3C/svg%3E')] pointer-events-none" />
-        <div className="text-2xl opacity-20 relative z-10 drop-shadow-md filter sepia">🐾</div>
+        {!customCardBack && (
+          <>
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'12\' height=\'12\' viewBox=\'0 0 12 12\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h12v12H0V0zm6 6h6v6H6V6zM0 6h6v6H0V6zm6-6h6v6H6V0z\' fill=\'%23ffffff\' fill-opacity=\'0.02\' fill-rule=\'evenodd\'/%3E%3C/svg%3E')] pointer-events-none" />
+            <div className="text-2xl opacity-20 relative z-10 drop-shadow-md filter sepia">
+              {theme.cardBack.emoji}
+            </div>
+          </>
+        )}
       </motion.div>
     );
   }
@@ -125,7 +137,12 @@ export default memo(function GameCard({
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" 
            style={{ background: `radial-gradient(circle at center, ${style.glow}33 0%, transparent 70%)` }} />
 
-      {/* Card content */}
+      {/* Card Illustration */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <CardIllustration type={card.type} className={`${size === 'sm' ? 'w-10 h-14' : size === 'lg' ? 'w-20 h-28' : 'w-16 h-22'} opacity-80`} />
+      </div>
+      
+      {/* Card content - emoji overlay */}
       <span className={`${s.emoji} drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] relative z-10 transition-transform group-hover:scale-110`}>
         {info.emoji}
       </span>
