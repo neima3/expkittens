@@ -203,8 +203,8 @@ export const ACTION_CARD_TYPES: CardType[] = ['attack', 'skip', 'favor', 'shuffl
 export const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'] as const;
 
 export const AI_DIFFICULTY_INFO: Record<AIDifficulty, { label: string; emoji: string; color: string; description: string }> = {
-  easy: { label: 'Easy', emoji: '😺', color: '#4ade80', description: 'Random play, never targets you' },
-  normal: { label: 'Normal', emoji: '😼', color: '#38bdf8', description: 'Basic strategy, occasional targeting' },
-  hard: { label: 'Hard', emoji: '😾', color: '#f97316', description: 'Optimal combos, bluff-aware' },
-  ruthless: { label: 'Ruthless', emoji: '🙀', color: '#ef4444', description: 'Card counting, aggressive targeting' },
+  easy: { label: 'Kitten', emoji: '😺', color: '#4ade80', description: 'Plays randomly — still learning how to cat' },
+  normal: { label: 'Normal', emoji: '😼', color: '#38bdf8', description: 'Basic strategy, occasionally dangerous' },
+  hard: { label: 'Hacker', emoji: '😾', color: '#f97316', description: 'Card counting, saves Nopes for Attacks' },
+  ruthless: { label: 'Chaos Mode', emoji: '🙀', color: '#ef4444', description: 'Chains Attacks, pure aggression, no mercy' },
 };

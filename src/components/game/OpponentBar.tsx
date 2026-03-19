@@ -52,6 +52,23 @@ export default memo(function OpponentBar({
                   className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-accent border-2 border-[#130f25] shadow-[0_0_8px_var(--color-accent)]"
                 />
               )}
+              {isCurrent && player.isAlive && player.isAI && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute -top-8 left-1/2 -translate-x-1/2 bg-surface-light/95 border border-border/60 rounded-lg px-2 py-0.5 text-[10px] text-text-muted font-medium whitespace-nowrap backdrop-blur-sm shadow-lg z-20 pointer-events-none"
+                >
+                  🤔{' '}
+                  {[0, 1, 2].map(i => (
+                    <motion.span
+                      key={i}
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.25 }}
+                      className="inline-block w-1 h-1 rounded-full bg-text-muted mx-px align-middle"
+                    />
+                  ))}
+                </motion.div>
+              )}
             </div>
             
             <div className="text-left relative z-10 pr-2">

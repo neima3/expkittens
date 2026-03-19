@@ -518,6 +518,54 @@ function getRuthlessAction(game: GameState, aiPlayer: Player): GameAction {
   return { type: 'draw', playerId: aiPlayer.id };
 }
 
+// --- AI trash talk ---
+
+const TRASH_TALK: Record<AIDifficulty, Record<string, string[]>> = {
+  easy: {
+    attack: ['Meow?', 'Did I do that right?', 'Oops?'],
+    skip: ['Skipping... I think?', 'Pass! Maybe.', 'Meow!'],
+    see_the_future: ['Oooh, shiny cards!', 'Pretty!', '*bats at deck*'],
+    shuffle: ['Shuffly shuffly!', 'Meow!', 'I like mixing things!'],
+    favor: ['Card please? Meow!', 'Can I have one? 🐾'],
+    pair: ['Two of them! I think!', '*bats at both cards*', 'Meow meow!'],
+    default: ['Meow?', 'Mrrrow!', 'Purr...', 'Meow!', '*confused kitten noises*'],
+  },
+  normal: {
+    attack: ['Your turn now.', 'Have fun with that.', 'Next player\'s turn.'],
+    skip: ['Not drawing today.', 'I\'ll pass.', 'Safe.'],
+    see_the_future: ['Interesting...', 'Knowledge is power.', 'I see things.'],
+    shuffle: ['Let\'s mix things up.', 'New deck order.', 'Fresh start.'],
+    favor: ['Share the wealth.', 'I need that card.', 'Hand it over.'],
+    pair: ['A steal!', 'Your cards look nice...', 'Mine now.'],
+    default: ['Watching you.', 'Hmm.', 'Noted.', 'Calculated.'],
+  },
+  hard: {
+    attack: ['Stack overflow your turn.', 'Calculated aggression.', 'I computed your downfall.', 'Threat vector: you.'],
+    skip: ['Probability favors me.', 'Risk assessment: skip.', 'Not today.', 'I do not gamble.'],
+    see_the_future: ['Running probability model...', 'I see everything 😎', 'Analysis complete.', 'Deck state: known.'],
+    shuffle: ['Resetting the dataset.', 'Your knowledge is obsolete now.', 'New entropy injected.'],
+    favor: ['Data acquisition complete.', 'Give me your best card.', 'Optimal extraction.'],
+    pair: ['Checkmate.', 'Your cards are mine now.', 'Optimal extraction complete.'],
+    default: ['Calculating...', 'As expected.', 'Optimal play.', 'Logically inevitable.', 'I see you.'],
+  },
+  ruthless: {
+    attack: ['ATTACK ATTACK ATTACK', 'Nice try, human 😈', 'SUFFER.', 'Come at me.', 'Your turn. 😈'],
+    skip: ['I do not draw. I conquer.', 'CHAOS.', 'No risk, only reward. 😈'],
+    see_the_future: ['I see your doom 😈', 'Your fate is sealed.', '👀 I know everything.', 'Peeking into your soul.'],
+    shuffle: ['DISORDER. CHAOS. MAYHEM.', 'How does it feel? 😈', 'Shuffling your suffering.', 'CHAOS REIGNS.'],
+    favor: ['Mine now. 😈', 'Thanks for the donation.', 'YOINK.', 'What\'s yours is mine.'],
+    pair: ['Nice donation. 😈', 'YOINK.', 'Your hand belongs to me.', 'Helpless. 😈'],
+    default: ['Nice try, human 😈', 'CHAOS REIGNS.', '😈', 'You were never safe.', 'SUFFER.', 'I am inevitable.'],
+  },
+};
+
+function pickTrashTalk(diff: AIDifficulty, key: string): string | null {
+  const chance = diff === 'easy' ? 0.2 : diff === 'normal' ? 0.25 : diff === 'hard' ? 0.35 : 0.55;
+  if (Math.random() > chance) return null;
+  const pool = TRASH_TALK[diff][key] ?? TRASH_TALK[diff].default;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 // --- Difficulty-aware turn delays ---
 
 function getTurnDelay(diff: AIDifficulty): number {
@@ -598,8 +646,35 @@ export async function processAITurn(game: GameState): Promise<{ game: GameState;
       }
       break;
     } else {
+      // Look up played card type before it's removed from hand
+      let talkKey = 'default';
+      if (action.type === 'play_card' && action.cardId) {
+        const playedCard = aiPlayer.hand.find(c => c.id === action.cardId);
+        if (playedCard) {
+          if (playedCard.type === 'attack') talkKey = 'attack';
+          else if (playedCard.type === 'skip') talkKey = 'skip';
+          else if (playedCard.type === 'see_the_future') talkKey = 'see_the_future';
+          else if (playedCard.type === 'shuffle') talkKey = 'shuffle';
+          else if (playedCard.type === 'favor') talkKey = 'favor';
+          else if (isCatCard(playedCard.type) && action.cardIds && action.cardIds.length >= 2) talkKey = 'pair';
+        }
+      }
+
       state = processAction(state, action);
       actions.push(action);
+
+      // Inject trash talk after the action log
+      const taunt = pickTrashTalk(diff, talkKey);
+      if (taunt && action.type === 'play_card') {
+        state.logs.push({
+          message: taunt,
+          timestamp: Date.now() + 1,
+          playerId: aiPlayer.id,
+          type: 'chat',
+          playerName: aiPlayer.name,
+        });
+      }
+
       await delay(getActionDelay(diff));
 
       if (state.pendingAction && state.pendingAction.playerId === aiPlayer.id) {
