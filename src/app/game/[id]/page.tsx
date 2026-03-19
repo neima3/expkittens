@@ -23,6 +23,7 @@ import ComboCoach from '@/components/game/ComboCoach';
 import AnimatedBackground from '@/components/game/AnimatedBackground';
 import CardPreviewOverlay from '@/components/game/CardPreviewOverlay';
 import SpectatorView from '@/components/game/SpectatorView';
+import CardActionAnimation, { type CardAction, type CardActionType } from '@/components/game/CardActionAnimation';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
@@ -31,6 +32,21 @@ import { AVATARS } from '@/types/game';
 
 function isCatCard(type: CardType): boolean {
   return CAT_CARD_TYPES.includes(type);
+}
+
+/** Parse a game log message to detect which card action occurred and combo count. */
+function detectActionFromLog(message: string): { type: CardActionType; comboCount?: 2 | 3 } | null {
+  if (message.includes('played Attack!') || message.includes("attack was Noped")) return { type: 'attack' };
+  if (message.includes('played Skip!') || message.includes("skip was Noped")) return { type: 'skip' };
+  if (message.includes('shuffled the deck!') || message.includes("shuffle was Noped")) return { type: 'shuffle' };
+  if (message.includes('is seeing the future') || message.includes("see the future was Noped")) return { type: 'see_the_future' };
+  if (message.includes('played Nope!') || message.includes('was Noped!')) return { type: 'nope' };
+  if (message.includes('defused the Exploding Kitten')) return { type: 'defuse' };
+  if (message.includes('asked') && message.includes('Favor')) return { type: 'favor' };
+  if (message.includes('drew an Exploding Kitten')) return { type: 'exploding_kitten' };
+  if (message.includes('played three')) return { type: 'cat_combo', comboCount: 3 };
+  if (message.includes('played a pair')) return { type: 'cat_combo', comboCount: 2 };
+  return null;
 }
 
 function getActionHint({
@@ -231,6 +247,7 @@ export default function GamePage() {
   const [progressUpdate, setProgressUpdate] = useState<ProgressUpdate | null>(null);
   const [matchStats, setMatchStats] = useState({ cardsDrawn: 0, defusesUsed: 0, opponentsEliminated: 0 });
   const [showPostMatchSummary, setShowPostMatchSummary] = useState(false);
+  const [cardAction, setCardAction] = useState<CardAction | null>(null);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -386,6 +403,16 @@ export default function GamePage() {
         for (const log of newLogs) {
           if (log.playerId && log.playerId !== playerId) {
             toast(log.message, { duration: 2500 });
+          }
+          // Trigger action animation for opponent actions (detect from log message)
+          if (log.playerId && log.playerId !== playerId) {
+            const detected = detectActionFromLog(log.message);
+            if (detected) {
+              const actor = data.game.players.find((p: Player) => p.id === log.playerId);
+              if (actor) {
+                setCardAction({ type: detected.type, actorName: actor.name, comboCount: detected.comboCount });
+              }
+            }
           }
         }
 
@@ -725,6 +752,17 @@ export default function GamePage() {
           setFlashColor(cardColor);
           if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
           flashTimerRef.current = setTimeout(() => setFlashColor(null), 300);
+          // Trigger cinematic action animation for card plays
+          // Exclude EK/defuse (explosion sequence) and see_the_future (has its own modal)
+          if (!['exploding_kitten', 'defuse', 'see_the_future'].includes(playedCard.type)) {
+            const isCat = isCatCard(playedCard.type);
+            if (isCat) {
+              const comboCount = (actionData.cardIds as string[] | undefined)?.length === 3 ? 3 : 2;
+              setCardAction({ type: 'cat_combo', actorName: myPlayer?.name ?? 'You', comboCount: comboCount as 2 | 3 });
+            } else {
+              setCardAction({ type: playedCard.type as CardActionType, actorName: myPlayer?.name ?? 'You' });
+            }
+          }
         }
       } else if (actionData.type === 'draw') {
         sounds?.cardDraw();
@@ -1115,6 +1153,12 @@ export default function GamePage() {
       <AnimatedBackground />
       <canvas ref={confettiRef} className="fixed inset-0 w-full h-full pointer-events-none z-[60]" />
       <canvas ref={particleRef} className="fixed inset-0 w-full h-full pointer-events-none z-[55]" />
+
+      {/* Card action cinematic overlay */}
+      <CardActionAnimation
+        action={cardAction}
+        onDone={() => setCardAction(null)}
+      />
 
       <AnimatePresence>
         {flashColor && (
