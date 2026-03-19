@@ -42,6 +42,8 @@ function HomeContent() {
   const [levelRemainingXp, setLevelRemainingXp] = useState(120);
   const [nextUnlock, setNextUnlock] = useState<string | null>(null);
 
+  const [showTutorialPrompt, setShowTutorialPrompt] = useState(false);
+
   useEffect(() => {
     const savedName = localStorage.getItem('ek_playerName');
     const savedAvatar = localStorage.getItem('ek_avatar');
@@ -60,6 +62,12 @@ function HomeContent() {
     setLevelRemainingXp(Math.max(0, level.nextLevelXp - level.xp));
     const next = getAchievements(stats).find(a => !a.unlocked);
     setNextUnlock(next ? `${next.emoji} ${next.title} (${next.progress}/${next.goal})` : 'All achievements unlocked');
+    // Show tutorial prompt for new players who haven't played or done the tutorial
+    const tutorialDone = localStorage.getItem('ek_tutorial_done');
+    const gamesCount = stats.gamesPlayed ?? 0;
+    if (!tutorialDone && gamesCount === 0) {
+      setShowTutorialPrompt(true);
+    }
   }, []);
 
   async function createGame() {
@@ -260,13 +268,62 @@ function HomeContent() {
                   )}
                 </div>
 
-                <div className="mt-8 lg:mt-10 flex items-center justify-center gap-6 text-sm lg:text-base">
+                {/* First-game tutorial prompt */}
+                <AnimatePresence>
+                  {showTutorialPrompt && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                      transition={{ delay: 0.3 }}
+                      className="mt-6 rounded-2xl p-4 border relative"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(170,51,255,0.12), rgba(19,15,37,0.95))',
+                        borderColor: 'rgba(170,51,255,0.4)',
+                        boxShadow: '0 0 24px rgba(170,51,255,0.1)',
+                      }}
+                    >
+                      <button
+                        onClick={() => setShowTutorialPrompt(false)}
+                        className="absolute top-2 right-3 text-text-muted/50 hover:text-text-muted text-lg leading-none transition-colors"
+                        aria-label="Dismiss"
+                      >
+                        ×
+                      </button>
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl flex-shrink-0">🎓</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm text-white mb-1">New to Exploding Kittens?</p>
+                          <p className="text-xs text-text-muted leading-relaxed mb-3">
+                            Learn the rules interactively with our 3-minute coached tutorial before your first game.
+                          </p>
+                          <Link
+                            href="/tutorial"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide text-white transition-all"
+                            style={{
+                              background: 'linear-gradient(135deg, #aa33ff, #7722cc)',
+                              boxShadow: '0 4px 12px rgba(170,51,255,0.3)',
+                            }}
+                          >
+                            Start Tutorial →
+                          </Link>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="mt-6 lg:mt-8 flex items-center justify-center gap-6 text-sm lg:text-base">
                   <Link href="/stats" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     View Stats
                   </Link>
                   <span className="text-border/50">•</span>
                   <Link href="/rules" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
                     How to Play
+                  </Link>
+                  <span className="text-border/50">•</span>
+                  <Link href="/cards" className="text-text-muted hover:text-text active:text-accent transition-colors py-2 px-1 font-medium">
+                    Card Guide
                   </Link>
                 </div>
               </div>
