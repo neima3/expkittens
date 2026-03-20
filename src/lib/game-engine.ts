@@ -378,24 +378,25 @@ export function processAction(game: GameState, action: GameAction): GameState {
         break;
       }
 
+      // Guard: Nope can only be played during a nope_window
+      if (card.type === 'nope' && state.pendingAction?.type !== 'nope_window') {
+        throw new Error('No action to Nope — wait for a Nope window');
+      }
+
       // Single card plays
       player.hand.splice(cardIndex, 1);
       state.discardPile.push(card);
 
       if (card.type === 'nope') {
-        // Nope during a nope window — add to chain
-        if (state.pendingAction?.type === 'nope_window') {
-          state.pendingAction.nopeChain = [...(state.pendingAction.nopeChain || []), player.id];
-          state.pendingAction.passedPlayerIds = []; // Reset passes for new nope window
-          state.pendingAction.expiresAt = Date.now() + NOPE_WINDOW_MS;
-          state.logs.push({ message: `${player.name} played Nope! (${state.pendingAction.nopeChain.length} in chain)`, timestamp: Date.now(), playerId: player.id });
-          // Check if anyone else can counter-nope
-          if (!canAnyoneNope(state, player.id)) {
-            // No one can counter — resolve immediately
-            state = resolveNopeWindow(state);
-          }
-        } else {
-          throw new Error('Nothing to Nope — play Nope during a Nope window');
+        // Nope during a nope window — add to chain (guard above ensures pendingAction.type === 'nope_window')
+        state.pendingAction!.nopeChain = [...(state.pendingAction!.nopeChain || []), player.id];
+        state.pendingAction!.passedPlayerIds = []; // Reset passes for new nope window
+        state.pendingAction!.expiresAt = Date.now() + NOPE_WINDOW_MS;
+        state.logs.push({ message: `${player.name} played Nope! (${state.pendingAction!.nopeChain.length} in chain)`, timestamp: Date.now(), playerId: player.id });
+        // Check if anyone else can counter-nope
+        if (!canAnyoneNope(state, player.id)) {
+          // No one can counter — resolve immediately
+          state = resolveNopeWindow(state);
         }
       } else if (isNopeableCard(card.type)) {
         // Nopeable card — create a nope window instead of executing immediately

@@ -24,6 +24,7 @@ import AnimatedBackground from '@/components/game/AnimatedBackground';
 import CardPreviewOverlay from '@/components/game/CardPreviewOverlay';
 import SpectatorView from '@/components/game/SpectatorView';
 import CardActionAnimation, { type CardAction, type CardActionType } from '@/components/game/CardActionAnimation';
+import DrawCardAnimation, { type DrawAnimationState } from '@/components/game/DrawCardAnimation';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
 import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
@@ -58,6 +59,7 @@ function getActionHint({
   canPlay,
   selectedCards,
   actionLoading,
+  isNopeSelectedOutsideWindow,
 }: {
   isMyTurn: boolean;
   hasPendingAction: boolean;
@@ -67,6 +69,7 @@ function getActionHint({
   canPlay: boolean;
   selectedCards: string[];
   actionLoading: boolean;
+  isNopeSelectedOutsideWindow: boolean;
 }): string {
   if (actionLoading) return 'Resolving action...';
   if (favorGiveMode) return 'You owe a Favor. Pick one card from your hand to give.';
@@ -75,6 +78,7 @@ function getActionHint({
   if (hasPendingAction) return 'Finish the current prompt to continue.';
   if (!isMyTurn) return 'Watch opponents and plan your next combo.';
   if (selectedCards.length === 0) return 'Select cards to play, or draw to end your turn.';
+  if (isNopeSelectedOutsideWindow) return 'Nope can only be played during a Nope window — hold it for the right moment!';
   if (canPlay) return 'You can play now or keep building a stronger combo.';
   return 'Selected cards are not a playable combo yet.';
 }
@@ -248,6 +252,14 @@ export default function GamePage() {
   const [matchStats, setMatchStats] = useState({ cardsDrawn: 0, defusesUsed: 0, opponentsEliminated: 0 });
   const [showPostMatchSummary, setShowPostMatchSummary] = useState(false);
   const [cardAction, setCardAction] = useState<CardAction | null>(null);
+  const [drawAnimation, setDrawAnimation] = useState<DrawAnimationState>({
+    isPlaying: false,
+    phase: 'none',
+    drawnCardType: null,
+    hasDefuse: false,
+    actorName: '',
+  });
+  const [deckElementPos, setDeckElementPos] = useState<{ x: number; y: number } | null>(null);
   const lastActionIdRef = useRef(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,9 +288,10 @@ export default function GamePage() {
   );
   const canPlayPair = selectedCards.length === 2 && !!selectedCard && isCatCard(selectedCard.type);
   const canPlayTriple = selectedCards.length === 3 && !!selectedCard && isCatCard(selectedCard.type);
-  const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse';
+  const canPlaySingle = selectedCards.length === 1 && !!selectedCard && !isCatCard(selectedCard.type) && selectedCard.type !== 'exploding_kitten' && selectedCard.type !== 'defuse' && selectedCard.type !== 'nope';
   const canPlay = isMyTurn && !hasPendingAction && (canPlaySingle || canPlayPair || canPlayTriple) && !actionLoading;
   const favorGiveMode = game?.pendingAction?.type === 'favor_give' && isPendingOnMe;
+  const isNopeSelectedOutsideWindow = selectedCards.length === 1 && selectedCard?.type === 'nope' && game?.pendingAction?.type !== 'nope_window';
   const actionHint = useMemo(() => getActionHint({
     isMyTurn,
     hasPendingAction,
@@ -288,7 +301,8 @@ export default function GamePage() {
     canPlay,
     selectedCards,
     actionLoading,
-  }), [isMyTurn, hasPendingAction, selectingTarget, selectingThreeTarget, favorGiveMode, canPlay, selectedCards, actionLoading]);
+    isNopeSelectedOutsideWindow,
+  }), [isMyTurn, hasPendingAction, selectingTarget, selectingThreeTarget, favorGiveMode, canPlay, selectedCards, actionLoading, isNopeSelectedOutsideWindow]);
 
   const selectableTargets = useMemo(() =>
     selectingTarget && game
@@ -353,7 +367,7 @@ export default function GamePage() {
     }
   }, [gameId, playerId]);
 
-  function handlePendingAction(g: GameState, pid: string) {
+  function handlePendingAction(g: GameState, pid: string, skipDefuseModal = false) {
     if (!g.pendingAction || g.pendingAction.playerId !== pid) return;
     switch (g.pendingAction.type) {
       case 'see_future':
@@ -362,8 +376,10 @@ export default function GamePage() {
         sounds?.seeFuture();
         break;
       case 'defuse_place':
-        setShowDefuseModal(true);
-        sounds?.defuse();
+        if (!skipDefuseModal) {
+          setShowDefuseModal(true);
+          sounds?.defuse();
+        }
         break;
       case 'steal_target':
         setSelectingTarget(true);
@@ -730,6 +746,11 @@ export default function GamePage() {
   async function sendAction(actionData: Record<string, unknown>) {
     if (actionLoading) return;
     setActionLoading(true);
+
+    const oldHand = myPlayer?.hand ? [...myPlayer.hand] : [];
+    const oldPlayerAlive = myPlayer?.isAlive ?? true;
+    let isExplodingKittenDraw = false;
+
     try {
       const res = await fetch(`/api/games/${gameId}/action`, {
         method: 'POST',
@@ -752,8 +773,6 @@ export default function GamePage() {
           setFlashColor(cardColor);
           if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
           flashTimerRef.current = setTimeout(() => setFlashColor(null), 300);
-          // Trigger cinematic action animation for card plays
-          // Exclude EK/defuse (explosion sequence) and see_the_future (has its own modal)
           if (!['exploding_kitten', 'defuse', 'see_the_future'].includes(playedCard.type)) {
             const isCat = isCatCard(playedCard.type);
             if (isCat) {
@@ -766,6 +785,26 @@ export default function GamePage() {
         }
       } else if (actionData.type === 'draw') {
         sounds?.cardDraw();
+
+        const me = data.game.players.find((p: Player) => p.id === playerId);
+        const newHand = me?.hand || [];
+
+        const drawnCard = newHand.find(
+          (newCard: Card) => !oldHand.some((oldCard) => oldCard.id === newCard.id)
+        );
+
+        if (drawnCard) {
+          const hasDefuse = newHand.some((c: Card) => c.type === 'defuse');
+          isExplodingKittenDraw = drawnCard.type === 'exploding_kitten';
+
+          setDrawAnimation({
+            isPlaying: true,
+            phase: 'travel',
+            drawnCardType: drawnCard.type,
+            hasDefuse: hasDefuse && isExplodingKittenDraw,
+            actorName: me?.name ?? 'You',
+          });
+        }
       } else if (actionData.type === 'defuse_place') {
         applyProgressUpdate(recordDefuseUsed());
       } else if (actionData.type === 'steal_target') {
@@ -775,12 +814,12 @@ export default function GamePage() {
       }
 
       const me = data.game.players.find((p: Player) => p.id === playerId);
-      if (me && !me.isAlive) {
+      if (me && !me.isAlive && oldPlayerAlive) {
         triggerExplosion({ name: me.name, avatar: me.avatar, isMe: true });
         applyProgressUpdate(recordExplosion());
       }
 
-      handlePendingAction(data.game, playerId);
+      handlePendingAction(data.game, playerId, isExplodingKittenDraw);
 
       if (data.game.status === 'finished') {
         handleGameEnd(data.game);
@@ -854,6 +893,16 @@ export default function GamePage() {
     const g = gameRef.current;
     const currentP = g ? g.players[g.currentPlayerIndex] : null;
     if (currentP?.id !== playerId || !!g?.pendingAction || actionLoadingRef.current) return;
+
+    const deckBtn = document.getElementById('draw-pile-btn');
+    if (deckBtn) {
+      const rect = deckBtn.getBoundingClientRect();
+      setDeckElementPos({
+        x: rect.left + rect.width / 2 - window.innerWidth / 2,
+        y: rect.top + rect.height / 2 - window.innerHeight / 2,
+      });
+    }
+
     sendAction({ type: 'draw' });
   }, [playerId]);
 
@@ -1158,6 +1207,18 @@ export default function GamePage() {
       <CardActionAnimation
         action={cardAction}
         onDone={() => setCardAction(null)}
+      />
+
+      <DrawCardAnimation
+        state={drawAnimation}
+        onDone={() => setDrawAnimation((prev) => ({ ...prev, isPlaying: false, phase: 'none' }))}
+        onDefusePlace={() => {
+          const g = gameRef.current;
+          if (g?.pendingAction?.type === 'defuse_place') {
+            setShowDefuseModal(true);
+          }
+        }}
+        deckPosition={deckElementPos || undefined}
       />
 
       <AnimatePresence>
