@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     let game = createGame({
       hostId: playerId,
-      hostName: playerName.slice(0, 20),
+      hostName: playerName.trim().slice(0, 20),
       hostAvatar: avatar,
       isMultiplayer,
       aiCount: isMultiplayer ? 0 : Math.min(Math.max(1, aiCount), 4),
