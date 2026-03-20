@@ -5,15 +5,21 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { getStats, getRankInfo, getAchievements, getLevelInfo, getFavoriteCardType, resetStats } from '@/lib/stats';
 import type { GameStats, GameResult } from '@/lib/stats';
+import { getTodayChallenge, getChallengeCompletion } from '@/lib/daily-challenges';
+import type { DailyChallenge, ChallengeCompletion } from '@/lib/daily-challenges';
 import { CARD_INFO } from '@/types/game';
 import type { CardType } from '@/types/game';
 
 export default function StatsPage() {
   const [stats, setStats] = useState<GameStats | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [todayChallenge, setTodayChallenge] = useState<DailyChallenge | null>(null);
+  const [challengeCompletion, setChallengeCompletion] = useState<ChallengeCompletion | null>(null);
 
   useEffect(() => {
     setStats(getStats());
+    setTodayChallenge(getTodayChallenge());
+    setChallengeCompletion(getChallengeCompletion());
   }, []);
 
   if (!stats) {
@@ -24,11 +30,20 @@ export default function StatsPage() {
     );
   }
 
-  return <StatsDashboard stats={stats} showResetConfirm={showResetConfirm} setShowResetConfirm={setShowResetConfirm} onReset={() => { resetStats(); setStats(getStats()); setShowResetConfirm(false); }} />;
+  return <StatsDashboard
+    stats={stats}
+    todayChallenge={todayChallenge}
+    challengeCompletion={challengeCompletion}
+    showResetConfirm={showResetConfirm}
+    setShowResetConfirm={setShowResetConfirm}
+    onReset={() => { resetStats(); setStats(getStats()); setShowResetConfirm(false); }}
+  />;
 }
 
-function StatsDashboard({ stats, showResetConfirm, setShowResetConfirm, onReset }: {
+function StatsDashboard({ stats, todayChallenge, challengeCompletion, showResetConfirm, setShowResetConfirm, onReset }: {
   stats: GameStats;
+  todayChallenge: DailyChallenge | null;
+  challengeCompletion: ChallengeCompletion | null;
   showResetConfirm: boolean;
   setShowResetConfirm: (v: boolean) => void;
   onReset: () => void;
@@ -61,6 +76,58 @@ function StatsDashboard({ stats, showResetConfirm, setShowResetConfirm, onReset 
             Player Stats
           </h1>
           <div className="w-20" />
+        </div>
+
+        {/* Daily Challenge */}
+        {todayChallenge && (
+          <div className={`glass-panel rounded-2xl p-5 mb-6 relative overflow-hidden border ${challengeCompletion ? 'border-success/30' : 'border-warning/20'}`}>
+            <div className={`absolute top-0 right-0 w-32 h-32 blur-[40px] pointer-events-none ${challengeCompletion ? 'bg-success/20' : 'bg-warning/15'}`} />
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📅</span>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-text-muted font-black">Daily Challenge</p>
+              </div>
+              {challengeCompletion ? (
+                <span className="text-xs font-black text-success bg-success/10 border border-success/30 px-2 py-0.5 rounded-full">✓ Completed</span>
+              ) : (
+                <span className="text-xs font-bold text-warning bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">+{todayChallenge.bonusXp} XP</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-3xl ${challengeCompletion ? '' : 'opacity-70'}`}>{todayChallenge.emoji}</span>
+              <div>
+                <p className={`font-black text-base ${challengeCompletion ? 'text-success' : 'text-white'}`}>{todayChallenge.title}</p>
+                <p className="text-sm text-text-muted">{todayChallenge.description}</p>
+              </div>
+            </div>
+            {!challengeCompletion && (
+              <p className="text-[10px] text-text-muted/60 mt-3">Resets at midnight. Win a game to complete it!</p>
+            )}
+          </div>
+        )}
+
+        {/* Coins + Leaderboard row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div className="glass-panel rounded-2xl p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-warning/15 blur-[30px] pointer-events-none" />
+            <p className="text-[10px] uppercase tracking-[0.15em] text-text-muted font-black mb-1">Coins</p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🪙</span>
+              <p className="text-3xl font-black text-warning" style={{ textShadow: '0 2px 8px rgba(255,184,51,0.4)' }}>{stats.coins || 0}</p>
+            </div>
+            <p className="text-[9px] text-text-muted/60 uppercase tracking-widest mt-2">
+              {stats.dailyChallengesCompleted || 0} daily challenges done
+            </p>
+          </div>
+          <Link href="/leaderboard" className="glass-panel rounded-2xl p-5 relative overflow-hidden hover:bg-white/10 transition-colors group cursor-pointer">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent/10 blur-[30px] pointer-events-none group-hover:bg-accent/20 transition-colors" />
+            <p className="text-[10px] uppercase tracking-[0.15em] text-text-muted font-black mb-1">Weekly Leaderboard</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-2xl">🏆</span>
+              <p className="text-base font-black text-accent">View Rankings</p>
+            </div>
+            <p className="text-[9px] text-text-muted/60 uppercase tracking-widest mt-2">Resets every Monday</p>
+          </Link>
         </div>
 
         {/* Rank & Level */}

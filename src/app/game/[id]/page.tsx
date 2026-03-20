@@ -27,8 +27,9 @@ import CardActionAnimation, { type CardAction, type CardActionType } from '@/com
 import DrawCardAnimation, { type DrawAnimationState } from '@/components/game/DrawCardAnimation';
 import { sounds } from '@/lib/sounds';
 import { launchConfetti, launchExplosionParticles } from '@/lib/confetti';
-import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
+import { recordWin, recordLoss, recordExplosion, recordCardPlayed, recordCardsStolen, recordDefuseUsed, recordCardTypePlayed, recordDailyChallengeCompletion, getStats, getRankInfo, getLevelInfo } from '@/lib/stats';
 import type { ProgressUpdate } from '@/lib/stats';
+import { getTodayChallenge, isChallengeCompletedToday, checkChallengeCondition, completeTodayChallenge } from '@/lib/daily-challenges';
 import { AVATARS } from '@/types/game';
 
 function isCatCard(type: CardType): boolean {
@@ -521,7 +522,29 @@ export default function GamePage() {
     hasRecordedResult.current = true;
     if (g.winnerId === playerId) {
       sounds?.win();
+
+      // Check daily challenge before recording win (so we can pass bonus XP)
+      let challengeBonusXp = 0;
+      if (!isChallengeCompletedToday()) {
+        const todayChallenge = getTodayChallenge();
+        if (checkChallengeCondition(todayChallenge, g, playerId)) {
+          completeTodayChallenge(todayChallenge.id);
+          challengeBonusXp = todayChallenge.bonusXp;
+          applyProgressUpdate(recordDailyChallengeCompletion(todayChallenge.bonusXp));
+          toast.success(`🎯 Daily Challenge complete! "${todayChallenge.title}" +${todayChallenge.bonusXp} XP +25 coins`, {
+            duration: 5000,
+          });
+        }
+      }
+
       applyProgressUpdate(recordWin());
+      // Submit win to weekly leaderboard (fire-and-forget)
+      const savedName = typeof window !== 'undefined' ? (localStorage.getItem('ek_playerName') || 'Anonymous') : 'Anonymous';
+      fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: savedName }),
+      }).catch(() => { /* non-critical */ });
       setTimeout(() => {
         if (confettiRef.current) launchConfetti(confettiRef.current);
       }, 300);

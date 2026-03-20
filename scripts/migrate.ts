@@ -44,6 +44,20 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS ek_replay_shares_expires_idx ON ek_replay_shares(expires_at)`;
   console.log('  ✓ ek_replay_shares indexes');
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS ek_leaderboard (
+      player_name TEXT NOT NULL,
+      week_start DATE NOT NULL,
+      wins INTEGER DEFAULT 1,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (player_name, week_start)
+    )
+  `;
+  console.log('  ✓ ek_leaderboard table');
+
+  await sql`CREATE INDEX IF NOT EXISTS ek_leaderboard_week_idx ON ek_leaderboard(week_start, wins DESC)`;
+  console.log('  ✓ ek_leaderboard indexes');
+
   console.log('Migrations complete.');
 }
 

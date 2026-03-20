@@ -21,6 +21,8 @@ export interface GameStats {
   bestWinStreak: number;
   xp: number;
   level: number;
+  coins: number;
+  dailyChallengesCompleted: number;
 }
 
 export interface RankInfo {
@@ -54,6 +56,7 @@ export interface ProgressUpdate {
   level: LevelInfo;
   gainedXp: number;
   leveledUp: boolean;
+  gainedCoins: number;
 }
 
 const STATS_KEY = 'ek_stats';
@@ -80,7 +83,7 @@ export function updateStats(updates: Partial<GameStats>) {
   localStorage.setItem(STATS_KEY, JSON.stringify(merged));
 }
 
-export function recordWin(): ProgressUpdate {
+export function recordWin(bonusXp = 0): ProgressUpdate {
   return mutateStats(stats => {
     stats.gamesPlayed++;
     stats.wins++;
@@ -91,7 +94,18 @@ export function recordWin(): ProgressUpdate {
     if (!stats.gameHistory) stats.gameHistory = [];
     stats.gameHistory.push({ timestamp: Date.now(), won: true });
     const streakBonus = Math.min(60, Math.max(0, stats.winStreak - 1) * 8);
-    return 120 + streakBonus;
+    // Streak bonus coins (1 per consecutive win above 1)
+    const streakCoins = Math.min(10, Math.max(0, stats.winStreak - 1) * 2);
+    stats.coins = (stats.coins || 0) + 10 + streakCoins;
+    return 120 + streakBonus + bonusXp;
+  });
+}
+
+export function recordDailyChallengeCompletion(bonusXp: number): ProgressUpdate {
+  return mutateStats(stats => {
+    stats.dailyChallengesCompleted = (stats.dailyChallengesCompleted || 0) + 1;
+    stats.coins = (stats.coins || 0) + 25; // bonus coins for daily challenge
+    return bonusXp;
   });
 }
 
@@ -262,6 +276,38 @@ export function getAchievements(stats: GameStats): Achievement[] {
       metric: 'level',
       goal: 10,
     },
+    {
+      id: 'nope-spammer',
+      emoji: '✋',
+      title: 'Nope Army',
+      description: 'Play 20 Nope cards total.',
+      metric: 'nopesPlayed',
+      goal: 20,
+    },
+    {
+      id: 'attack-addict',
+      emoji: '⚔️',
+      title: 'Attack Addict',
+      description: 'Play 25 Attack cards total.',
+      metric: 'attacksPlayed',
+      goal: 25,
+    },
+    {
+      id: 'daily-grinder',
+      emoji: '📅',
+      title: 'Daily Grinder',
+      description: 'Complete 7 daily challenges.',
+      metric: 'dailyChallengesCompleted',
+      goal: 7,
+    },
+    {
+      id: 'cat-lady',
+      emoji: '🐱',
+      title: 'Cat Lady',
+      description: 'Steal 50 cards from opponents.',
+      metric: 'cardsStolen',
+      goal: 50,
+    },
   ];
 
   return defs.map(def => {
@@ -303,10 +349,12 @@ export function getLevelInfo(stats: GameStats): LevelInfo {
 function mutateStats(mutator: (stats: GameStats) => number): ProgressUpdate {
   const stats = getStats();
   const previousLevel = getLevelInfo(stats).level;
+  const previousCoins = stats.coins || 0;
   const gainedXp = Math.max(0, Math.round(mutator(stats)));
   stats.xp += gainedXp;
   const level = getLevelInfo(stats);
   stats.level = level.level;
+  const gainedCoins = (stats.coins || 0) - previousCoins;
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
@@ -317,6 +365,7 @@ function mutateStats(mutator: (stats: GameStats) => number): ProgressUpdate {
     level,
     gainedXp,
     leveledUp: level.level > previousLevel,
+    gainedCoins: Math.max(0, gainedCoins),
   };
 }
 
@@ -337,5 +386,7 @@ function defaultStats(): GameStats {
     bestWinStreak: 0,
     xp: 0,
     level: 1,
+    coins: 0,
+    dailyChallengesCompleted: 0,
   };
 }
