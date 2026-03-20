@@ -8,37 +8,13 @@ export interface ReplayShare {
   expiresAt: string;
 }
 
+// Lazy singleton — reused within a single serverless invocation, recreated across cold starts.
+// Schema setup is handled by scripts/migrate.ts at deploy time, not at request time.
+let _sql: ReturnType<typeof neon> | null = null;
+
 function getDb() {
-  const sql = neon(process.env.DATABASE_URL!);
-  return sql;
-}
-
-let dbInitialized = false;
-
-export async function initializeDatabase() {
-  if (dbInitialized) return;
-  const sql = getDb();
-  await sql`
-    CREATE TABLE IF NOT EXISTS ek_games (
-      id TEXT PRIMARY KEY,
-      code TEXT UNIQUE NOT NULL,
-      state JSONB NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS ek_games_code_idx ON ek_games(code)`;
-  await sql`CREATE INDEX IF NOT EXISTS ek_games_updated_idx ON ek_games(updated_at)`;
-  await sql`
-    CREATE TABLE IF NOT EXISTS ek_replay_shares (
-      share_id TEXT PRIMARY KEY,
-      game_state JSONB NOT NULL,
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      expires_at TIMESTAMPTZ NOT NULL
-    )
-  `;
-  await sql`CREATE INDEX IF NOT EXISTS ek_replay_shares_expires_idx ON ek_replay_shares(expires_at)`;
-  dbInitialized = true;
+  if (!_sql) _sql = neon(process.env.DATABASE_URL!);
+  return _sql;
 }
 
 export async function saveGame(game: GameState): Promise<void> {

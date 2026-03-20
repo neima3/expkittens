@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeRoomsTable, getRoom, updateRoom } from '@/lib/rooms-db';
-import { initializeDatabase, saveGame } from '@/lib/db';
+import { saveGame } from '@/lib/db';
 import { createGame, startGame } from '@/lib/game-engine';
 import { nanoid } from 'nanoid';
 
@@ -10,7 +10,6 @@ export async function POST(
 ) {
   try {
     await initializeRoomsTable();
-    await initializeDatabase();
     const { code } = await params;
     const body = await req.json();
     const { playerId } = body;

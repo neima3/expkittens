@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createGame, startGame } from '@/lib/game-engine';
-import { saveGame, initializeDatabase, maybeCleanupOldGames } from '@/lib/db';
+import { saveGame, maybeCleanupOldGames } from '@/lib/db';
 import { nanoid } from 'nanoid';
 
 export async function POST(req: NextRequest) {
   try {
-    await initializeDatabase();
     void maybeCleanupOldGames();
 
     const body = await req.json();

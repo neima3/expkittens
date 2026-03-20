@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
+import { getGameById, saveGame } from '@/lib/db';
 import { getSpectatorView } from '@/lib/game-engine';
 import { nanoid } from 'nanoid';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initializeDatabase();
     const { id } = await params;
     const body = await req.json();
     const { playerName, avatar = 0 } = body;

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
+import { getGameById, saveGame } from '@/lib/db';
 import { processAction, resolveNopeWindow, getPlayerView } from '@/lib/game-engine';
 import { processAITurn, processAINopeResponses } from '@/lib/ai';
 import type { GameAction } from '@/types/game';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initializeDatabase();
     const { id } = await params;
     const body = await req.json();
     const { playerId, ...actionData } = body;

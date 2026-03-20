@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
+import { getGameById, saveGame } from '@/lib/db';
 
 const COOLDOWN_MS = 5000;
 const MAX_MESSAGE_LENGTH = 100;
@@ -15,7 +15,6 @@ const QUICK_PRESETS = [
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initializeDatabase();
     const { id } = await params;
     const body = await req.json();
     const { playerId, spectatorId, message, preset } = body as {

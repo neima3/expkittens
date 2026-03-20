@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameById, saveGame, initializeDatabase } from '@/lib/db';
+import { getGameById, saveGame } from '@/lib/db';
 import { getPlayerView, getSpectatorView, startGame } from '@/lib/game-engine';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initializeDatabase();
     const { id } = await params;
     const playerId = req.nextUrl.searchParams.get('playerId');
     const spectatorId = req.nextUrl.searchParams.get('spectatorId');
@@ -31,7 +30,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await initializeDatabase();
     const { id } = await params;
     const body = await req.json();
     const { action, playerId } = body;
