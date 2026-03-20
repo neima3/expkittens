@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame } from '@/lib/db';
 import { getPlayerView, getSpectatorView, startGame } from '@/lib/game-engine';
+import { emitGameUpdate } from '@/lib/game-events';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const started = startGame(game);
       await saveGame(started);
+      emitGameUpdate(id);
       return NextResponse.json({ game: getPlayerView(started, playerId) });
     }
 

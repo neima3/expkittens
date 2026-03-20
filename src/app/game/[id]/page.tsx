@@ -244,7 +244,6 @@ export default function GamePage() {
   const [rematchCountdown, setRematchCountdown] = useState<number | null>(null);
   const [rematchGameId, setRematchGameId] = useState<string | null>(null);
   const rematchRedirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pollIntervalMs, setPollIntervalMs] = useState(2500);
   const [rankTitle, setRankTitle] = useState('Rookie Spark');
   const [levelInfo, setLevelInfo] = useState(() => getLevelInfo(getStats()));
   const [xpGain, setXpGain] = useState<number | null>(null);
@@ -259,9 +258,10 @@ export default function GamePage() {
     hasDefuse: false,
     actorName: '',
   });
+  const [pendingExplosion, setPendingExplosion] = useState<{ name: string; avatar: number; isMe: boolean } | null>(null);
   const [deckElementPos, setDeckElementPos] = useState<{ x: number; y: number } | null>(null);
   const lastActionIdRef = useRef(0);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const esRef = useRef<EventSource | null>(null);
   const xpGainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explosionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -544,6 +544,7 @@ export default function GamePage() {
       if (explosionTimerRef.current) clearTimeout(explosionTimerRef.current);
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
       if (rematchRedirectTimerRef.current) clearTimeout(rematchRedirectTimerRef.current);
+      esRef.current?.close();
       pollAbortRef.current?.abort();
     };
   }, []);
@@ -619,47 +620,111 @@ export default function GamePage() {
 
   const rematchVotesRef = useRef<string[]>([]);
   rematchVotesRef.current = rematchVotes;
+  const rematchGameIdRef = useRef<string | null>(null);
+  rematchGameIdRef.current = rematchGameId;
 
+  // Connect via SSE for real-time game updates; fall back to a poll on visibility restore
   useEffect(() => {
-    const computeInterval = () => {
-      if (document.hidden) return 5000;
-      if (gameStatusRef.current === 'finished' && rematchVotesRef.current.length > 0) return 2000;
-      if (gameStatusRef.current === 'finished') return 8000;
-      if (gameStatusRef.current === 'waiting') return 3000;
-      if (isMyTurnRef.current) return 1500;
-      return 2500;
-    };
-    const updatePolling = () => {
-      setPollIntervalMs(computeInterval());
+    if (!playerId && !spectatorId) return;
+
+    const idParam = spectatorId ? `spectatorId=${spectatorId}` : `playerId=${playerId}`;
+
+    function openSSE() {
+      esRef.current?.close();
+      const es = new EventSource(`/api/games/${gameId}/events?${idParam}`);
+      esRef.current = es;
+
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data as string) as { game?: GameState; lastActionId?: number; error?: string };
+          if (!data.game) return;
+          if (data.lastActionId !== undefined && data.lastActionId <= lastActionIdRef.current) return;
+
+          const oldGame = gameRef.current;
+          setGame(data.game);
+          if (data.lastActionId !== undefined) lastActionIdRef.current = data.lastActionId;
+
+          if (oldGame) {
+            const newLogs = data.game.logs.slice(oldGame.logs.length);
+            for (const log of newLogs) {
+              if (log.playerId && log.playerId !== playerId) {
+                toast(log.message, { duration: 2500 });
+              }
+              if (log.playerId && log.playerId !== playerId) {
+                const detected = detectActionFromLog(log.message);
+                if (detected) {
+                  const actor = data.game.players.find((p: Player) => p.id === log.playerId);
+                  if (actor) setCardAction({ type: detected.type, actorName: actor.name, comboCount: detected.comboCount });
+                }
+              }
+            }
+            for (const p of data.game.players) {
+              const oldP = oldGame.players.find(op => op.id === p.id);
+              if (oldP?.isAlive && !p.isAlive) {
+                triggerExplosion({ name: p.name, avatar: p.avatar, isMe: p.id === playerId });
+                if (p.id === playerId) applyProgressUpdate(recordExplosion());
+              }
+            }
+          }
+
+          handlePendingAction(data.game, playerId);
+
+          if (data.game.status === 'finished') {
+            handleGameEnd(data.game);
+            if (data.game.rematchRequests) setRematchVotes(data.game.rematchRequests);
+            const newRematchGameId = data.game.rematchGameId;
+            if (newRematchGameId && !rematchGameIdRef.current) {
+              setRematchGameId(newRematchGameId);
+              setRematchCountdown(data.game.rematchCountdown || Date.now());
+              fetch(`/api/games/${gameId}/rematch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ playerId }),
+              })
+                .then(r => r.json())
+                .then(d => {
+                  if (d.playerIdMap?.[playerId]) {
+                    localStorage.setItem(`ek_player_${newRematchGameId}`, d.playerIdMap[playerId]);
+                  }
+                  rematchRedirectTimerRef.current = setTimeout(() => {
+                    router.push(`/game/${newRematchGameId}`);
+                  }, 5000);
+                })
+                .catch(() => {});
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      es.onerror = () => {
+        // Browser auto-reconnects EventSource; close and re-open to reset state
+        es.close();
+        if (esRef.current === es) {
+          esRef.current = null;
+          setTimeout(openSSE, 3000);
+        }
+      };
+    }
+
+    openSSE();
+
+    // Re-open SSE and do an immediate poll when tab becomes visible again
+    const onVisibility = () => {
       if (!document.hidden) {
+        openSSE();
         void poll();
       }
     };
-    updatePolling();
-    document.addEventListener('visibilitychange', updatePolling);
-    return () => document.removeEventListener('visibilitychange', updatePolling);
-  }, [poll]);
+    document.addEventListener('visibilitychange', onVisibility);
 
-  useEffect(() => {
-    if (document.hidden) return;
-    if (game?.status === 'finished' && rematchVotes.length > 0) {
-      setPollIntervalMs(2000);
-    } else if (game?.status === 'finished') {
-      setPollIntervalMs(8000);
-    } else if (isMyTurn) {
-      setPollIntervalMs(1500);
-    } else {
-      setPollIntervalMs(2500);
-    }
-  }, [isMyTurn, game?.status, rematchVotes.length]);
-
-  useEffect(() => {
-    if (!playerId && !spectatorId) return;
-    pollIntervalRef.current = setInterval(poll, pollIntervalMs);
     return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
+      esRef.current?.close();
+      esRef.current = null;
     };
-  }, [playerId, spectatorId, poll, pollIntervalMs]);
+  }, [gameId, playerId, spectatorId]);
 
   useEffect(() => {
     if (isMyTurn && game?.status === 'playing') {
@@ -815,8 +880,12 @@ export default function GamePage() {
 
       const me = data.game.players.find((p: Player) => p.id === playerId);
       if (me && !me.isAlive && oldPlayerAlive) {
-        triggerExplosion({ name: me.name, avatar: me.avatar, isMe: true });
-        applyProgressUpdate(recordExplosion());
+        if (isExplodingKittenDraw && !drawAnimation.hasDefuse) {
+          setPendingExplosion({ name: me.name, avatar: me.avatar, isMe: true });
+        } else {
+          triggerExplosion({ name: me.name, avatar: me.avatar, isMe: true });
+          applyProgressUpdate(recordExplosion());
+        }
       }
 
       handlePendingAction(data.game, playerId, isExplodingKittenDraw);
@@ -1211,7 +1280,14 @@ export default function GamePage() {
 
       <DrawCardAnimation
         state={drawAnimation}
-        onDone={() => setDrawAnimation((prev) => ({ ...prev, isPlaying: false, phase: 'none' }))}
+        onDone={() => {
+          setDrawAnimation((prev) => ({ ...prev, isPlaying: false, phase: 'none' }));
+          if (pendingExplosion) {
+            triggerExplosion(pendingExplosion);
+            applyProgressUpdate(recordExplosion());
+            setPendingExplosion(null);
+          }
+        }}
         onDefusePlace={() => {
           const g = gameRef.current;
           if (g?.pendingAction?.type === 'defuse_place') {
@@ -1542,19 +1618,24 @@ export default function GamePage() {
               className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md"
             >
               <div className="bg-surface/95 backdrop-blur-xl border-2 border-[#888] rounded-2xl p-4 shadow-[0_0_30px_rgba(136,136,136,0.3)]">
-                {/* Timer bar */}
-                <div className="w-full h-1.5 rounded-full bg-border/50 mb-3 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: timeLeft <= 2 ? '#ff3355' : '#888888' }}
-                    initial={{ width: '100%' }}
-                    animate={{ width: `${(timeLeft / 5) * 100}%` }}
-                    transition={{ duration: 0.1 }}
-                  />
-                </div>
-
-                {/* Header */}
-                <div className="flex items-center gap-2 mb-3">
+                {/* Circular countdown ring + Header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <svg className="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
+                      <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
+                      <motion.circle
+                        cx="18" cy="18" r="15.5" fill="none"
+                        stroke={timeLeft <= 2 ? '#ff3355' : '#888888'}
+                        strokeWidth="2.5" strokeLinecap="round"
+                        initial={{ strokeDasharray: '97.4 97.4' }}
+                        animate={{ strokeDasharray: `${(timeLeft / 5) * 97.4} 97.4` }}
+                        transition={{ duration: 0.1, ease: 'linear' }}
+                      />
+                    </svg>
+                    <span className={`absolute inset-0 flex items-center justify-center text-lg font-bold ${timeLeft <= 2 ? 'text-danger animate-pulse' : 'text-text'}`}>
+                      {Math.ceil(timeLeft)}
+                    </span>
+                  </div>
                   <span className="text-2xl">✋</span>
                   <div className="text-left flex-1">
                     <p className="text-sm font-bold">

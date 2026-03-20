@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame } from '@/lib/db';
 import { getPlayerView, getSpectatorView, resolveNopeWindow } from '@/lib/game-engine';
 import { processAITurn } from '@/lib/ai';
+import { emitGameUpdate } from '@/lib/game-events';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       }
       await saveGame(game);
+      emitGameUpdate(id);
     }
 
     // Only return full state if something changed

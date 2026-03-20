@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameById, saveGame } from '@/lib/db';
+import { emitGameUpdate } from '@/lib/game-events';
 
 const COOLDOWN_MS = 5000;
 const MAX_MESSAGE_LENGTH = 100;
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     game.updatedAt = now;
 
     await saveGame(game);
+    emitGameUpdate(id);
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
