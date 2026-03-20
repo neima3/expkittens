@@ -134,7 +134,7 @@ export function createGame(options: {
   const game: GameState = {
     id: nanoid(12),
     code,
-    status: 'waiting',
+    status: 'waiting', // lifecycle: waiting → playing → finished
     players,
     deck: [],
     discardPile: [],
