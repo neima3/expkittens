@@ -12,7 +12,7 @@ export async function POST(
     await initializeRoomsTable();
     const { code } = await params;
     const body = await req.json();
-    const { playerId } = body;
+    const { playerId, expansionEnabled } = body;
 
     if (!playerId) {
       return NextResponse.json({ error: 'playerId required' }, { status: 400 });
@@ -46,6 +46,7 @@ export async function POST(
       hostAvatar: host.avatar,
       isMultiplayer: true,
       aiCount: 0,
+      expansionEnabled: expansionEnabled === true,
     });
 
     // Add the remaining ready players (skip host, already in game)

@@ -30,14 +30,14 @@ export async function saveGame(game: GameState): Promise<void> {
 
 export async function getGameById(id: string): Promise<GameState | null> {
   const sql = getDb();
-  const rows = await sql`SELECT state FROM ek_games WHERE id = ${id}`;
+  const rows = await sql`SELECT state FROM ek_games WHERE id = ${id}` as Record<string, unknown>[];
   if (rows.length === 0) return null;
   return rows[0].state as GameState;
 }
 
 export async function getGameByCode(code: string): Promise<GameState | null> {
   const sql = getDb();
-  const rows = await sql`SELECT state FROM ek_games WHERE code = ${code}`;
+  const rows = await sql`SELECT state FROM ek_games WHERE code = ${code}` as Record<string, unknown>[];
   if (rows.length === 0) return null;
   return rows[0].state as GameState;
 }
@@ -62,7 +62,7 @@ export async function getReplayShare(shareId: string): Promise<ReplayShare | nul
     SELECT share_id, game_state, created_at, expires_at
     FROM ek_replay_shares
     WHERE share_id = ${shareId} AND expires_at > NOW()
-  `;
+  ` as Record<string, unknown>[];
   if (rows.length === 0) return null;
   return {
     shareId: rows[0].share_id as string,
@@ -125,7 +125,7 @@ export async function upsertPlayerStats(playerName: string, inc: PlayerStatsIncr
 
 export async function getPlayerStatsByName(playerName: string): Promise<PlayerStats | null> {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM ek_player_stats WHERE player_name = ${playerName}`;
+  const rows = await sql`SELECT * FROM ek_player_stats WHERE player_name = ${playerName}` as Record<string, unknown>[];
   if (rows.length === 0) return null;
   const r = rows[0];
   return {
@@ -147,7 +147,7 @@ export async function getTopPlayerStats(limit = 20): Promise<PlayerStats[]> {
     SELECT * FROM ek_player_stats
     ORDER BY wins DESC, games_played DESC
     LIMIT ${limit}
-  `;
+  ` as Record<string, unknown>[];
   return rows.map(r => ({
     playerName: r.player_name as string,
     gamesPlayed: r.games_played as number,

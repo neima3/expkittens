@@ -123,6 +123,7 @@ export default function RoomPage() {
   const [joining, setJoining] = useState(false);
   const [starting, setStarting] = useState(false);
   const [togglingReady, setTogglingReady] = useState(false);
+  const [expansionEnabled, setExpansionEnabled] = useState(false);
 
   const lastEventIdRef = useRef(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -274,7 +275,7 @@ export default function RoomPage() {
       const res = await fetch(`/api/rooms/${code}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: myPlayerId }),
+        body: JSON.stringify({ playerId: myPlayerId, expansionEnabled }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -497,6 +498,29 @@ export default function RoomPage() {
           {/* Host start button */}
           {isHost && (
             <div className="space-y-2">
+              {/* Expansion toggle */}
+              <button
+                onClick={() => setExpansionEnabled(v => !v)}
+                className={`w-full py-3 px-4 rounded-2xl text-left transition-all border-2 ${
+                  expansionEnabled
+                    ? 'border-[#7B2FBE] bg-[#7B2FBE]/15 text-[#cc88ff]'
+                    : 'border-border bg-surface-light/50 text-text-muted hover:border-border/80'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 ${
+                    expansionEnabled ? 'border-[#7B2FBE] bg-[#7B2FBE]' : 'border-border'
+                  }`}>
+                    {expansionEnabled && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <div>
+                    <p className={`font-black text-sm uppercase tracking-wider mb-0.5 ${expansionEnabled ? 'text-[#a855f7]' : ''}`}>
+                      ☢️ Imploding Kittens Expansion
+                    </p>
+                    <p className="text-xs opacity-70">Adds Imploding Kitten, Reverse, Draw from Bottom &amp; Feral Cat</p>
+                  </div>
+                </div>
+              </button>
               <motion.button
                 whileHover={canStart ? { scale: 1.02, boxShadow: '0 20px 40px rgba(255,95,46,0.4)' } : {}}
                 whileTap={canStart ? { scale: 0.97 } : {}}

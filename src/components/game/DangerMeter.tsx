@@ -11,15 +11,11 @@ interface DangerMeterProps {
 }
 
 export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount = 0, discardedEKs = 0 }: DangerMeterProps) {
-  // Adjusted EK count: subtract known defused/discarded kittens
   const ekRemaining = Math.max(0, alivePlayers - 1 - discardedEKs);
-  const rawDanger = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
-  const rawPercent = Math.round(rawDanger * 100);
+  const baseRisk = deckSize > 0 ? Math.min(1, ekRemaining / deckSize) : 0;
+  const rawPercent = Math.round(baseRisk * 100);
 
-  // Effective danger: account for defuse cards as safety buffer
-  // Each defuse negates one bomb encounter, reducing effective lethal threats
-  const effectiveThreats = Math.max(0, ekRemaining - defuseCount);
-  const danger = deckSize > 0 ? Math.min(1, effectiveThreats / deckSize) : 0;
+  const danger = baseRisk * Math.pow(0.5, defuseCount);
   const percent = Math.round(danger * 100);
   const shielded = defuseCount > 0;
 
@@ -39,7 +35,7 @@ export default memo(function DangerMeter({ deckSize, alivePlayers, defuseCount =
     color = '#ffb833';
     glow = 'rgba(255,184,51,0.2)';
     label = shielded ? 'Guarded' : 'Medium';
-  } else if (rawDanger > 0.15 && shielded) {
+  } else if (baseRisk > 0.15 && shielded) {
     // Raw danger is notable but defuses bring effective danger down
     color = '#2bd47c';
     glow = 'rgba(43,212,124,0.15)';

@@ -105,19 +105,50 @@ const CARD_DETAILS: Record<CardType, {
     category: 'CAT CARD',
     danger: 'low',
   },
+  // Imploding Kittens expansion
+  imploding_kitten: {
+    tip: 'Draw it face-down and you must place it back face-up — everyone now sees it ticking in the deck. Draw it face-up and you implode instantly: no Defuse can save you! Strategic placement is key.',
+    nopeable: false,
+    quantity: '1 per game (expansion)',
+    category: 'DANGER',
+    danger: 'critical',
+  },
+  reverse: {
+    tip: 'Flips the play direction and skips your draw, acting like a turbo-Skip. Combine with Attack to send 2 forced turns backwards. Great for turning the pressure around on aggressive players.',
+    nopeable: true,
+    quantity: '4 in the deck (expansion)',
+    category: 'ACTION',
+    danger: 'medium',
+  },
+  draw_from_bottom: {
+    tip: 'Draw from the bottom instead of the top. Useful when See the Future revealed an Exploding Kitten at the top — dodge it entirely. But be careful: nobody knows what lurks at the bottom!',
+    nopeable: true,
+    quantity: '4 in the deck (expansion)',
+    category: 'ACTION',
+    danger: 'medium',
+  },
+  feral_cat: {
+    tip: 'A wild card that pairs with ANY other cat for a steal combo. Play it with one cat for a random steal (pair), or use it alongside two matching cats for a targeted steal (triple). Extremely flexible.',
+    nopeable: true,
+    quantity: '4 in the deck (expansion)',
+    category: 'CAT CARD',
+    danger: 'medium',
+  },
 };
 
 const ALL_CARDS: CardType[] = [
   'exploding_kitten', 'defuse', 'attack', 'skip', 'favor',
   'shuffle', 'see_the_future', 'nope',
   'taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat',
+  // Imploding Kittens expansion
+  'imploding_kitten', 'reverse', 'draw_from_bottom', 'feral_cat',
 ];
 
 const CATEGORIES = ['All', 'Action', 'Cat Card', 'Counter', 'Danger', 'Lifesaver'] as const;
 type CategoryFilter = typeof CATEGORIES[number];
 
 function getCategoryFilter(type: CardType): CategoryFilter {
-  if (type === 'exploding_kitten') return 'Danger';
+  if (type === 'exploding_kitten' || type === 'imploding_kitten') return 'Danger';
   if (type === 'defuse') return 'Lifesaver';
   if (type === 'nope') return 'Counter';
   if (CAT_CARD_TYPES.includes(type)) return 'Cat Card';
