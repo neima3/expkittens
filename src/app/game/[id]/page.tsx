@@ -504,23 +504,47 @@ export default function GamePage() {
     let cardsDrawn = 0;
     let defusesUsed = 0;
     let opponentsEliminated = 0;
-    
+    let nopesPlayed = 0;
+    let kittensDrawn = 0;
+    let cardsPlayedCount = 0;
+
     g.logs.forEach(log => {
       if (log.playerId === playerId) {
         if (log.message.includes('drew')) cardsDrawn++;
         if (log.message.includes('defused')) defusesUsed++;
+        if (log.message.includes('played Nope')) nopesPlayed++;
+        if (log.message.includes('EXPLODED')) kittensDrawn++;
+        if (log.message.includes('played ') && !log.message.includes('Nope')) cardsPlayedCount++;
       }
       if (log.message.includes('exploded') && log.playerId !== playerId) {
         opponentsEliminated++;
       }
     });
-    
+
     setMatchStats({ cardsDrawn, defusesUsed, opponentsEliminated });
     setShowPostMatchSummary(true);
-    
+
     if (hasRecordedResult.current) return;
     hasRecordedResult.current = true;
-    if (g.winnerId === playerId) {
+
+    const won = g.winnerId === playerId;
+    const savedName = typeof window !== 'undefined' ? (localStorage.getItem('ek_playerName') || 'Anonymous') : 'Anonymous';
+
+    // Persist stats to DB (fire-and-forget)
+    fetch('/api/stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        playerName: savedName,
+        won,
+        kittensDrawn,
+        defusesUsed,
+        nopesPlayed,
+        cardsPlayed: cardsPlayedCount,
+      }),
+    }).catch(() => { /* non-critical */ });
+
+    if (won) {
       sounds?.win();
 
       // Check daily challenge before recording win (so we can pass bonus XP)
@@ -539,7 +563,6 @@ export default function GamePage() {
 
       applyProgressUpdate(recordWin());
       // Submit win to weekly leaderboard (fire-and-forget)
-      const savedName = typeof window !== 'undefined' ? (localStorage.getItem('ek_playerName') || 'Anonymous') : 'Anonymous';
       fetch('/api/leaderboard', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

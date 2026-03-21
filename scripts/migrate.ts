@@ -58,6 +58,24 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS ek_leaderboard_week_idx ON ek_leaderboard(week_start, wins DESC)`;
   console.log('  ✓ ek_leaderboard indexes');
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS ek_player_stats (
+      player_name TEXT PRIMARY KEY,
+      games_played INTEGER DEFAULT 0,
+      wins INTEGER DEFAULT 0,
+      losses INTEGER DEFAULT 0,
+      kittens_drawn INTEGER DEFAULT 0,
+      defuses_used INTEGER DEFAULT 0,
+      nopes_played INTEGER DEFAULT 0,
+      cards_played INTEGER DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  console.log('  ✓ ek_player_stats table');
+
+  await sql`CREATE INDEX IF NOT EXISTS ek_player_stats_wins_idx ON ek_player_stats(wins DESC)`;
+  console.log('  ✓ ek_player_stats indexes');
+
   console.log('Migrations complete.');
 }
 

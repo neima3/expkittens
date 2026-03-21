@@ -9,17 +9,26 @@ import { getTodayChallenge, getChallengeCompletion } from '@/lib/daily-challenge
 import type { DailyChallenge, ChallengeCompletion } from '@/lib/daily-challenges';
 import { CARD_INFO } from '@/types/game';
 import type { CardType } from '@/types/game';
+import type { StatsResponse } from '@/app/api/stats/route';
 
 export default function StatsPage() {
   const [stats, setStats] = useState<GameStats | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [todayChallenge, setTodayChallenge] = useState<DailyChallenge | null>(null);
   const [challengeCompletion, setChallengeCompletion] = useState<ChallengeCompletion | null>(null);
+  const [dbData, setDbData] = useState<StatsResponse | null>(null);
 
   useEffect(() => {
     setStats(getStats());
     setTodayChallenge(getTodayChallenge());
     setChallengeCompletion(getChallengeCompletion());
+
+    const playerName = localStorage.getItem('ek_playerName') || '';
+    const url = playerName ? `/api/stats?playerName=${encodeURIComponent(playerName)}` : '/api/stats';
+    fetch(url)
+      .then(r => r.json())
+      .then((d: StatsResponse) => setDbData(d))
+      .catch(() => { /* non-critical */ });
   }, []);
 
   if (!stats) {
@@ -37,16 +46,18 @@ export default function StatsPage() {
     showResetConfirm={showResetConfirm}
     setShowResetConfirm={setShowResetConfirm}
     onReset={() => { resetStats(); setStats(getStats()); setShowResetConfirm(false); }}
+    dbData={dbData}
   />;
 }
 
-function StatsDashboard({ stats, todayChallenge, challengeCompletion, showResetConfirm, setShowResetConfirm, onReset }: {
+function StatsDashboard({ stats, todayChallenge, challengeCompletion, showResetConfirm, setShowResetConfirm, onReset, dbData }: {
   stats: GameStats;
   todayChallenge: DailyChallenge | null;
   challengeCompletion: ChallengeCompletion | null;
   showResetConfirm: boolean;
   setShowResetConfirm: (v: boolean) => void;
   onReset: () => void;
+  dbData: StatsResponse | null;
 }) {
   const rank = getRankInfo(stats);
   const level = getLevelInfo(stats);
@@ -233,6 +244,85 @@ function StatsDashboard({ stats, todayChallenge, challengeCompletion, showResetC
             <h2 className="text-xs uppercase tracking-[0.15em] text-text-muted font-black mb-4">Cards Breakdown</h2>
             <CardTypeBreakdown counts={stats.cardTypeCounts} />
           </div>
+        )}
+
+        {/* DB Lifetime Stats */}
+        {dbData?.playerStats && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-panel rounded-2xl p-5 mb-6 relative overflow-hidden border border-accent/20"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-accent/5 blur-[50px] pointer-events-none" />
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-base">🌐</span>
+              <h2 className="text-xs uppercase tracking-[0.15em] text-text-muted font-black">Lifetime Stats (All Devices)</h2>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              <StatBox label="Games" value={dbData.playerStats.gamesPlayed} />
+              <StatBox label="Wins" value={dbData.playerStats.wins} color="#2bd47c" />
+              <StatBox label="Losses" value={dbData.playerStats.losses} color="#ff3355" />
+              <StatBox
+                label="Win Rate"
+                value={dbData.playerStats.gamesPlayed > 0 ? `${Math.round((dbData.playerStats.wins / dbData.playerStats.gamesPlayed) * 100)}%` : '0%'}
+                color={dbData.playerStats.gamesPlayed > 0 && dbData.playerStats.wins / dbData.playerStats.gamesPlayed >= 0.5 ? '#2bd47c' : '#ffb833'}
+              />
+              <StatBox label="Explosions" value={dbData.playerStats.kittensDrawn} emoji="💥" color="#ff3355" />
+              <StatBox label="Defuses" value={dbData.playerStats.defusesUsed} emoji="🔧" color="#44BB44" />
+              <StatBox label="Nopes" value={dbData.playerStats.nopesPlayed} emoji="✋" color="#888" />
+              <StatBox label="Cards Played" value={dbData.playerStats.cardsPlayed} emoji="🃏" />
+            </div>
+          </motion.div>
+        )}
+
+        {/* All-Time Leaderboard */}
+        {dbData && dbData.leaderboard.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="glass-panel rounded-2xl p-5 mb-6"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-base">👑</span>
+                <h2 className="text-xs uppercase tracking-[0.15em] text-text-muted font-black">All-Time Leaderboard</h2>
+              </div>
+              <Link href="/leaderboard" className="text-[10px] text-accent hover:text-accent/80 font-bold uppercase tracking-widest transition-colors">
+                Weekly →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {dbData.leaderboard.slice(0, 10).map((entry, i) => {
+                const isMe = entry.playerName === (typeof window !== 'undefined' ? localStorage.getItem('ek_playerName') : '');
+                const medalEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+                return (
+                  <div
+                    key={entry.playerName}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${isMe ? 'border-accent/40 bg-accent/10' : 'border-white/5 bg-white/5'}`}
+                  >
+                    <div className="w-8 text-center shrink-0">
+                      {medalEmoji ? (
+                        <span className="text-lg">{medalEmoji}</span>
+                      ) : (
+                        <span className="text-xs font-black text-text-muted">#{entry.rank}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-black text-sm truncate ${isMe ? 'text-accent' : 'text-white'}`}>
+                        {entry.playerName}{isMe && ' (You)'}
+                      </p>
+                      <p className="text-[10px] text-text-muted/60">{entry.gamesPlayed} games · {entry.winRate}% win rate</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-lg font-black ${i < 3 ? 'text-warning' : 'text-white/70'}`}>{entry.wins}</p>
+                      <p className="text-[9px] text-text-muted/60 uppercase tracking-widest">{entry.wins === 1 ? 'win' : 'wins'}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
         )}
 
         {/* Achievements */}
