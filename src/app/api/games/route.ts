@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     void maybeCleanupOldGames();
 
     const body = await req.json();
-    const { playerName, avatar = 0, mode, aiCount = 1, aiDifficulty, bestOf } = body;
+    const { playerName, avatar = 0, mode, aiCount = 1, aiDifficulty, bestOf, expansionEnabled } = body;
 
     if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       aiCount: isMultiplayer ? 0 : Math.min(Math.max(1, aiCount), 4),
       aiDifficulty: validDifficulty,
       bestOf: validBestOf,
+      expansionEnabled: expansionEnabled === true,
     });
 
     if (!isMultiplayer) {

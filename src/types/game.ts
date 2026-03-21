@@ -1,5 +1,6 @@
 export type CardType =
   | 'exploding_kitten'
+  | 'imploding_kitten'
   | 'defuse'
   | 'attack'
   | 'skip'
@@ -7,15 +8,19 @@ export type CardType =
   | 'shuffle'
   | 'see_the_future'
   | 'nope'
+  | 'reverse'
+  | 'draw_from_bottom'
   | 'taco_cat'
   | 'rainbow_cat'
   | 'beard_cat'
   | 'cattermelon'
-  | 'potato_cat';
+  | 'potato_cat'
+  | 'feral_cat';
 
 export interface Card {
   id: string;
   type: CardType;
+  faceUp?: boolean; // imploding_kitten placed face-up in deck
 }
 
 export type GameStatus = 'waiting' | 'playing' | 'finished';
@@ -33,17 +38,17 @@ export interface Player {
 }
 
 export interface GameAction {
-  type: 'play_card' | 'draw' | 'defuse_place' | 'favor_give' | 'nope' | 'nope_pass' | 'nope_resolve' | 'see_future_ack' | 'steal_target' | 'three_of_kind_target';
+  type: 'play_card' | 'draw' | 'defuse_place' | 'imploding_kitten_place' | 'favor_give' | 'nope' | 'nope_pass' | 'nope_resolve' | 'see_future_ack' | 'steal_target' | 'three_of_kind_target';
   playerId: string;
   cardId?: string;
   cardIds?: string[];
   targetPlayerId?: string;
   targetCardType?: CardType;
-  position?: number; // for defuse placement
+  position?: number; // for defuse / imploding_kitten placement
 }
 
 export interface PendingAction {
-  type: 'favor_give' | 'defuse_place' | 'nope_window' | 'see_future' | 'steal_target' | 'three_of_kind_target';
+  type: 'favor_give' | 'defuse_place' | 'imploding_kitten_place' | 'nope_window' | 'see_future' | 'steal_target' | 'three_of_kind_target';
   playerId: string; // player who needs to respond
   sourcePlayerId?: string; // player who initiated
   cards?: Card[]; // for see_future
@@ -106,6 +111,9 @@ export interface GameState {
   isMultiplayer: boolean;
   hostId: string;
   lastActionId: number;
+  // Expansion fields
+  expansionEnabled?: boolean;
+  playDirection: 1 | -1; // 1 = forward (default), -1 = reversed
   // Rematch fields (multiplayer)
   rematchRequests?: string[]; // player IDs who want a rematch
   rematchGameId?: string; // new game ID once rematch is created
@@ -195,10 +203,36 @@ export const CARD_INFO: Record<CardType, { name: string; description: string; em
     emoji: '🥔',
     color: '#DEB887',
   },
+  // Imploding Kittens expansion
+  imploding_kitten: {
+    name: 'Imploding Kitten',
+    description: 'Draw this face-down and place it back face-up. Draw it face-up and you instantly implode — no Defuse can save you!',
+    emoji: '☢️',
+    color: '#7B2FBE',
+  },
+  reverse: {
+    name: 'Reverse',
+    description: 'Reverse the direction of play. Also counts as a Skip for the current player.',
+    emoji: '🔄',
+    color: '#1DA1F2',
+  },
+  draw_from_bottom: {
+    name: 'Draw from the Bottom',
+    description: 'Draw the bottom card of the deck instead of the top.',
+    emoji: '⬇️',
+    color: '#E67E22',
+  },
+  feral_cat: {
+    name: 'Feral Cat',
+    description: 'Wild cat card — pairs with any other cat card for a steal, or forms any triple combo.',
+    emoji: '😾',
+    color: '#2ECC71',
+  },
 };
 
-export const CAT_CARD_TYPES: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat'];
-export const ACTION_CARD_TYPES: CardType[] = ['attack', 'skip', 'favor', 'shuffle', 'see_the_future', 'nope'];
+export const CAT_CARD_TYPES: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat', 'feral_cat'];
+export const ACTION_CARD_TYPES: CardType[] = ['attack', 'skip', 'favor', 'shuffle', 'see_the_future', 'nope', 'reverse', 'draw_from_bottom'];
+export const EXPANSION_CARD_TYPES: CardType[] = ['imploding_kitten', 'reverse', 'draw_from_bottom', 'feral_cat'];
 
 export const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'] as const;
 

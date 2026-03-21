@@ -22,7 +22,7 @@ function createCard(type: CardType): Card {
   return { id: nanoid(8), type };
 }
 
-function buildDeck(playerCount: number): { deck: Card[]; playerHands: Card[][] } {
+function buildDeck(playerCount: number, expansionEnabled?: boolean): { deck: Card[]; playerHands: Card[][] } {
   const cards: Card[] = [];
 
   // 4 Attack cards
@@ -37,10 +37,20 @@ function buildDeck(playerCount: number): { deck: Card[]; playerHands: Card[][] }
   for (let i = 0; i < 5; i++) cards.push(createCard('see_the_future'));
   // 5 Nope cards
   for (let i = 0; i < 5; i++) cards.push(createCard('nope'));
-  // 4 of each cat card = 20 cat cards
+  // 4 of each base cat card = 20 cat cards
   const catTypes: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat'];
   for (const catType of catTypes) {
     for (let i = 0; i < 4; i++) cards.push(createCard(catType));
+  }
+
+  // Imploding Kittens expansion cards
+  if (expansionEnabled) {
+    // 4 Reverse cards
+    for (let i = 0; i < 4; i++) cards.push(createCard('reverse'));
+    // 4 Draw from the Bottom cards
+    for (let i = 0; i < 4; i++) cards.push(createCard('draw_from_bottom'));
+    // 4 Feral Cat cards
+    for (let i = 0; i < 4; i++) cards.push(createCard('feral_cat'));
   }
 
   // Shuffle the deck
@@ -66,6 +76,11 @@ function buildDeck(playerCount: number): { deck: Card[]; playerHands: Card[][] }
     shuffled.push(createCard('exploding_kitten'));
   }
 
+  // Add 1 Imploding Kitten if expansion enabled
+  if (expansionEnabled) {
+    shuffled.push(createCard('imploding_kitten'));
+  }
+
   // Shuffle the final deck
   const finalDeck = shuffle(shuffled);
 
@@ -81,6 +96,7 @@ export function createGame(options: {
   aiDifficulty?: AIDifficulty;
   bestOf?: 3 | 5;
   existingSeries?: SeriesState;
+  expansionEnabled?: boolean;
 }): GameState {
   const code = nanoid(6).toUpperCase();
   const players: Player[] = [
@@ -148,6 +164,8 @@ export function createGame(options: {
     isMultiplayer: options.isMultiplayer,
     hostId: options.hostId,
     lastActionId: 0,
+    expansionEnabled: options.expansionEnabled,
+    playDirection: 1,
     series,
   };
 
@@ -158,7 +176,7 @@ export function startGame(game: GameState): GameState {
   const playerCount = game.players.length;
   if (playerCount < 2) throw new Error('Need at least 2 players');
 
-  const { deck, playerHands } = buildDeck(playerCount);
+  const { deck, playerHands } = buildDeck(playerCount, game.expansionEnabled);
 
   const players = game.players.map((p, i) => ({
     ...p,
@@ -194,6 +212,7 @@ export function startGame(game: GameState): GameState {
     discardPile: [],
     currentPlayerIndex: 0,
     turnsRemaining: 1,
+    playDirection: 1,
     logs: startLogs,
     updatedAt: Date.now(),
     lastActionId: game.lastActionId + 1,
@@ -203,22 +222,23 @@ export function startGame(game: GameState): GameState {
 
 export function getNextAlivePlayerIndex(game: GameState, fromIndex: number): number {
   const count = game.players.length;
-  let idx = (fromIndex + 1) % count;
+  const dir = game.playDirection ?? 1;
+  let idx = (fromIndex + dir + count) % count;
   while (!game.players[idx].isAlive) {
-    idx = (idx + 1) % count;
+    idx = (idx + dir + count) % count;
     if (idx === fromIndex) break;
   }
   return idx;
 }
 
 function isCatCard(type: CardType): boolean {
-  return ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat'].includes(type);
+  return ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat', 'feral_cat'].includes(type);
 }
 
 const NOPE_WINDOW_MS = 5000;
 
 function isNopeableCard(type: CardType): boolean {
-  return ['attack', 'skip', 'favor', 'shuffle', 'see_the_future'].includes(type);
+  return ['attack', 'skip', 'favor', 'shuffle', 'see_the_future', 'reverse', 'draw_from_bottom'].includes(type);
 }
 
 function canAnyoneNope(state: GameState, excludePlayerId: string): boolean {
@@ -292,6 +312,79 @@ function executeNopeableAction(state: GameState, action: GameAction, cardPlayed:
       state.logs.push({ message: `${player.name} asked ${target.name} for a Favor!`, timestamp: Date.now(), playerId: player.id });
       break;
     }
+    case 'reverse': {
+      // Flip play direction and skip this player's turn
+      state.playDirection = (state.playDirection === 1 ? -1 : 1) as 1 | -1;
+      state.logs.push({ message: `${player.name} reversed the direction of play!`, timestamp: Date.now(), playerId: player.id });
+      state.turnsRemaining--;
+      if (state.turnsRemaining <= 0) {
+        state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+        state.turnsRemaining = 1;
+      }
+      break;
+    }
+    case 'draw_from_bottom': {
+      // Draw from bottom of deck — handled separately via a special draw mode
+      // We flag the pending action so the draw handler knows to use the bottom card
+      state.logs.push({ message: `${player.name} played Draw from the Bottom!`, timestamp: Date.now(), playerId: player.id });
+      // Execute the bottom draw immediately
+      if (state.deck.length === 0) break;
+      const drawnCard = state.deck.pop()!;
+      if (drawnCard.type === 'exploding_kitten') {
+        const defuseIndex = player.hand.findIndex(c => c.type === 'defuse');
+        if (defuseIndex !== -1) {
+          state.pendingAction = { type: 'defuse_place', playerId: player.id, cardPlayed: 'exploding_kitten' };
+          player.hand.splice(defuseIndex, 1);
+          state.discardPile.push(createCard('defuse'));
+          state.logs.push({ message: `${player.name} drew an Exploding Kitten from the bottom but has a Defuse!`, timestamp: Date.now(), playerId: player.id });
+        } else {
+          player.isAlive = false;
+          state.discardPile.push(drawnCard, ...player.hand);
+          player.hand = [];
+          state.logs.push({ message: `💥 ${player.name} drew an Exploding Kitten from the bottom and EXPLODED!`, timestamp: Date.now(), playerId: player.id });
+          const alivePlayers = state.players.filter(p => p.isAlive);
+          if (alivePlayers.length === 1) {
+            state.winnerId = alivePlayers[0].id;
+            state.status = 'finished';
+            state.logs.push({ message: `🏆 ${alivePlayers[0].name} wins!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
+          } else {
+            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+            state.turnsRemaining = 1;
+          }
+        }
+      } else if (drawnCard.type === 'imploding_kitten') {
+        if (drawnCard.faceUp) {
+          // Face-up imploding kitten = instant death, no defuse
+          player.isAlive = false;
+          state.discardPile.push(drawnCard, ...player.hand);
+          player.hand = [];
+          state.logs.push({ message: `☢️ ${player.name} drew the face-up Imploding Kitten from the bottom and IMPLODED!`, timestamp: Date.now(), playerId: player.id });
+          const alivePlayers = state.players.filter(p => p.isAlive);
+          if (alivePlayers.length === 1) {
+            state.winnerId = alivePlayers[0].id;
+            state.status = 'finished';
+            state.logs.push({ message: `🏆 ${alivePlayers[0].name} wins!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
+          } else {
+            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+            state.turnsRemaining = 1;
+          }
+        } else {
+          // Face-down imploding kitten = place it back face-up
+          state.pendingAction = { type: 'imploding_kitten_place', playerId: player.id, cardPlayed: 'imploding_kitten' };
+          state.logs.push({ message: `☢️ ${player.name} drew the Imploding Kitten from the bottom! Place it back face-up.`, timestamp: Date.now(), playerId: player.id });
+        }
+      } else {
+        player.hand.push(drawnCard);
+        state.logs.push({ message: `${player.name} drew a card from the bottom.`, timestamp: Date.now(), playerId: player.id });
+        // End turn
+        state.turnsRemaining--;
+        if (state.turnsRemaining <= 0) {
+          state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+          state.turnsRemaining = 1;
+        }
+      }
+      break;
+    }
   }
   return state;
 }
@@ -339,42 +432,49 @@ export function processAction(game: GameState, action: GameAction): GameState {
         const card2Index = player.hand.findIndex(c => c.id === action.cardIds![1]);
         if (card2Index === -1) throw new Error('Second card not in hand');
         const card2 = player.hand[card2Index];
-        if (card.type !== card2.type) throw new Error('Cards must match for pair');
+        // Feral Cat is wild — it can pair with any other cat
+        const validPair = card.type === card2.type || card.type === 'feral_cat' || card2.type === 'feral_cat';
+        if (!validPair) throw new Error('Cards must match for pair (or use Feral Cat as wild)');
 
         // Remove both cards
         player.hand = player.hand.filter(c => c.id !== action.cardIds![0] && c.id !== action.cardIds![1]);
         state.discardPile.push(card, card2);
 
+        const pairLabel = card.type === 'feral_cat' ? card2.type.replace(/_/g, ' ') : card.type.replace(/_/g, ' ');
         state.pendingAction = {
           type: 'steal_target',
           playerId: action.playerId,
           sourcePlayerId: action.playerId,
           cardPlayed: card.type,
         };
-        state.logs.push({ message: `${player.name} played a pair of ${card.type.replace(/_/g, ' ')}s!`, timestamp: Date.now(), playerId: player.id });
+        state.logs.push({ message: `${player.name} played a pair of ${pairLabel}s!`, timestamp: Date.now(), playerId: player.id });
         break;
       }
 
       // Check for three of a kind
       if (action.cardIds && action.cardIds.length === 3 && isCatCard(card.type)) {
-        const allSameType = action.cardIds.every(id => {
-          const c = player.hand.find(h => h.id === id);
-          return c && c.type === card.type;
-        });
-        if (!allSameType) throw new Error('All three cards must match');
+        const playedCards = action.cardIds.map(id => player.hand.find(h => h.id === id)).filter(Boolean) as Card[];
+        if (playedCards.length !== 3) throw new Error('Cards not found');
+        // Feral Cat is wild — count feral cats as the non-feral type for triple validation
+        const nonFeralTypes = playedCards.filter(c => c.type !== 'feral_cat').map(c => c.type);
+        const feralCount = playedCards.filter(c => c.type === 'feral_cat').length;
+        const uniqueNonFeral = [...new Set(nonFeralTypes)];
+        const validTriple = feralCount === 3 || (uniqueNonFeral.length === 1) || (feralCount >= 1 && uniqueNonFeral.length <= 1);
+        if (!validTriple) throw new Error('Three cards must be the same type (Feral Cat is wild)');
 
         // Collect cards before removing them
         const removedCards = action.cardIds.map(id => player.hand.find(c => c.id === id)!).filter(Boolean);
         player.hand = player.hand.filter(c => !action.cardIds!.includes(c.id));
         state.discardPile.push(...removedCards);
 
+        const tripleLabel = nonFeralTypes[0]?.replace(/_/g, ' ') ?? 'feral cat';
         state.pendingAction = {
           type: 'three_of_kind_target',
           playerId: action.playerId,
           sourcePlayerId: action.playerId,
           cardPlayed: card.type,
         };
-        state.logs.push({ message: `${player.name} played three ${card.type.replace(/_/g, ' ')}s!`, timestamp: Date.now(), playerId: player.id });
+        state.logs.push({ message: `${player.name} played three ${tripleLabel}s!`, timestamp: Date.now(), playerId: player.id });
         break;
       }
 
@@ -420,7 +520,38 @@ export function processAction(game: GameState, action: GameAction): GameState {
 
       const drawnCard = state.deck.shift()!;
 
-      if (drawnCard.type === 'exploding_kitten') {
+      if (drawnCard.type === 'imploding_kitten') {
+        if (drawnCard.faceUp) {
+          // Face-up = instant death, no Defuse allowed
+          player.isAlive = false;
+          state.discardPile.push(drawnCard, ...player.hand);
+          player.hand = [];
+          state.logs.push({ message: `☢️ ${player.name} drew the face-up Imploding Kitten and IMPLODED!`, timestamp: Date.now(), playerId: player.id });
+
+          const alivePlayers = state.players.filter(p => p.isAlive);
+          if (alivePlayers.length === 1) {
+            state.winnerId = alivePlayers[0].id;
+            state.status = 'finished';
+            state.logs.push({ message: `🏆 ${alivePlayers[0].name} wins!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
+            if (state.series) {
+              const winnerName = alivePlayers[0].name;
+              const scores = { ...state.series.scores };
+              scores[winnerName] = (scores[winnerName] || 0) + 1;
+              const winsNeeded = Math.ceil(state.series.bestOf / 2);
+              const history = [...state.series.history, { gameId: state.id, winnerId: alivePlayers[0].id, winnerName, matchNumber: state.series.currentMatch }];
+              const seriesWinnerId = scores[winnerName] >= winsNeeded ? alivePlayers[0].id : undefined;
+              state.series = { ...state.series, scores, history, seriesWinnerId };
+            }
+          } else {
+            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+            state.turnsRemaining = 1;
+          }
+        } else {
+          // Face-down = player must place it back face-up
+          state.pendingAction = { type: 'imploding_kitten_place', playerId: player.id, cardPlayed: 'imploding_kitten' };
+          state.logs.push({ message: `☢️ ${player.name} drew the Imploding Kitten! Place it back face-up in the deck.`, timestamp: Date.now(), playerId: player.id });
+        }
+      } else if (drawnCard.type === 'exploding_kitten') {
         // Check for Defuse
         const defuseIndex = player.hand.findIndex(c => c.type === 'defuse');
         if (defuseIndex !== -1) {
@@ -499,6 +630,27 @@ export function processAction(game: GameState, action: GameAction): GameState {
       state.deck.splice(validPos, 0, ek);
       state.pendingAction = null;
       state.logs.push({ message: `${player.name} defused the Exploding Kitten and placed it back in the deck.`, timestamp: Date.now(), playerId: player.id });
+
+      // End turn
+      state.turnsRemaining--;
+      if (state.turnsRemaining <= 0) {
+        state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+        state.turnsRemaining = 1;
+      }
+      break;
+    }
+
+    case 'imploding_kitten_place': {
+      if (!state.pendingAction || state.pendingAction.type !== 'imploding_kitten_place') {
+        throw new Error('No imploding kitten placement pending');
+      }
+      const ikPos = action.position ?? Math.floor(Math.random() * (state.deck.length + 1));
+      const validIkPos = Math.max(0, Math.min(ikPos, state.deck.length));
+      // Place it back face-up so everyone can see it
+      const ik: Card = { id: `ik_${nanoid(6)}`, type: 'imploding_kitten', faceUp: true };
+      state.deck.splice(validIkPos, 0, ik);
+      state.pendingAction = null;
+      state.logs.push({ message: `☢️ ${player.name} placed the Imploding Kitten face-up at position ${validIkPos + 1} in the deck!`, timestamp: Date.now(), playerId: player.id });
 
       // End turn
       state.turnsRemaining--;
@@ -608,9 +760,10 @@ export function processAction(game: GameState, action: GameAction): GameState {
 
 export function getSpectatorView(game: GameState): GameState {
   // Spectators see card counts but never card contents, and no spectator_chat in logs for players
+  // Face-up cards in deck (e.g. imploding kitten) remain visible
   return {
     ...game,
-    deck: game.deck.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })),
+    deck: game.deck.map(c => c.faceUp ? c : { id: 'hidden', type: 'exploding_kitten' as CardType }),
     players: game.players.map(p => ({
       ...p,
       hand: p.hand.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })),
@@ -625,9 +778,10 @@ export function getSpectatorView(game: GameState): GameState {
 
 export function getPlayerView(game: GameState, playerId: string): GameState {
   // Return game state with hidden information for other players
+  // Face-up cards in deck (e.g. imploding kitten) are visible to all players
   return {
     ...game,
-    deck: game.deck.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })), // hide deck contents
+    deck: game.deck.map(c => c.faceUp ? c : { id: 'hidden', type: 'exploding_kitten' as CardType }),
     players: game.players.map(p => ({
       ...p,
       hand: p.id === playerId ? p.hand : p.hand.map(() => ({ id: 'hidden', type: 'exploding_kitten' as CardType })),

@@ -33,6 +33,8 @@ function getCardPriority(type: CardType): number {
     case 'attack': return 9;
     case 'shuffle': return 6;
     case 'favor': return 5;
+    case 'reverse': return 6;
+    case 'draw_from_bottom': return 7;
     default: return 3; // cat cards
   }
 }
@@ -40,17 +42,37 @@ function getCardPriority(type: CardType): number {
 function findPairs(hand: Card[]): [Card, Card][] {
   const pairs: [Card, Card][] = [];
   const byType: Record<string, Card[]> = {};
+  const feralCats: Card[] = [];
   for (const card of hand) {
-    if (isCatCard(card.type)) {
+    if (!isCatCard(card.type)) continue;
+    if (card.type === 'feral_cat') {
+      feralCats.push(card);
+    } else {
       if (!byType[card.type]) byType[card.type] = [];
       byType[card.type].push(card);
     }
   }
+  // Natural pairs first
   for (const type in byType) {
     const cards = byType[type];
     for (let i = 0; i + 1 < cards.length; i += 2) {
       pairs.push([cards[i], cards[i + 1]]);
     }
+  }
+  // Feral cat pairs with leftover cats
+  const feralPool = [...feralCats];
+  for (const type in byType) {
+    const cards = byType[type];
+    const leftover = cards.length % 2 === 1 ? [cards[cards.length - 1]] : [];
+    for (const lo of leftover) {
+      if (feralPool.length > 0) {
+        pairs.push([lo, feralPool.pop()!]);
+      }
+    }
+  }
+  // Two feral cats form a pair
+  for (let i = 0; i + 1 < feralPool.length; i += 2) {
+    pairs.push([feralPool[i], feralPool[i + 1]]);
   }
   return pairs;
 }
@@ -58,16 +80,40 @@ function findPairs(hand: Card[]): [Card, Card][] {
 function findTriples(hand: Card[]): [Card, Card, Card][] {
   const triples: [Card, Card, Card][] = [];
   const byType: Record<string, Card[]> = {};
+  const feralCats: Card[] = [];
   for (const card of hand) {
-    if (isCatCard(card.type)) {
+    if (!isCatCard(card.type)) continue;
+    if (card.type === 'feral_cat') {
+      feralCats.push(card);
+    } else {
       if (!byType[card.type]) byType[card.type] = [];
       byType[card.type].push(card);
     }
   }
+  // Natural triples
   for (const type in byType) {
     const cards = byType[type];
     if (cards.length >= 3) {
       triples.push([cards[0], cards[1], cards[2]]);
+    }
+  }
+  // Feral-assisted triples: two of same type + 1 feral
+  if (feralCats.length > 0) {
+    for (const type in byType) {
+      if (byType[type].length === 2) {
+        const [c1, c2] = byType[type];
+        triples.push([c1, c2, feralCats[0]]);
+        break;
+      }
+    }
+  }
+  // Two ferals + any cat
+  if (feralCats.length >= 2) {
+    for (const type in byType) {
+      if (byType[type].length >= 1) {
+        triples.push([feralCats[0], feralCats[1], byType[type][0]]);
+        break;
+      }
     }
   }
   return triples;
@@ -264,6 +310,18 @@ export function getAIAction(game: GameState, aiPlayer: Player): GameAction | nul
       return { type: 'defuse_place', playerId: aiPlayer.id, position };
     }
 
+    if (game.pendingAction.type === 'imploding_kitten_place' && game.pendingAction.playerId === aiPlayer.id) {
+      // Ruthless/Hard: place near top to trap next player. Others: random or near bottom for safety.
+      const diff = getDifficulty(aiPlayer);
+      const deckSize = game.deck.length;
+      let ikPos: number;
+      if (diff === 'ruthless') ikPos = 0; // top of deck — next player draws it
+      else if (diff === 'hard') ikPos = Math.min(1, deckSize);
+      else if (diff === 'normal') ikPos = Math.floor(deckSize / 2 + Math.random() * deckSize / 2);
+      else ikPos = Math.max(0, deckSize - Math.floor(Math.random() * 3)); // bottom
+      return { type: 'imploding_kitten_place', playerId: aiPlayer.id, position: Math.min(ikPos, deckSize) };
+    }
+
     if (game.pendingAction.type === 'see_future' && game.pendingAction.playerId === aiPlayer.id) {
       return { type: 'see_future_ack', playerId: aiPlayer.id };
     }
@@ -358,6 +416,10 @@ function getNormalAction(game: GameState, aiPlayer: Player): GameAction {
     const attack = hand.find(c => c.type === 'attack');
     if (attack) return { type: 'play_card', playerId: aiPlayer.id, cardId: attack.id };
 
+    // Reverse also skips your turn
+    const reverse = hand.find(c => c.type === 'reverse');
+    if (reverse) return { type: 'play_card', playerId: aiPlayer.id, cardId: reverse.id };
+
     // Shuffle if very dangerous
     if (dangerLevel > 0.4) {
       const shuffleCard = hand.find(c => c.type === 'shuffle');
@@ -423,6 +485,9 @@ function getHardAction(game: GameState, aiPlayer: Player): GameAction {
     if (dangerLevel > 0.2 || (!hasDefuse && dangerLevel > 0.1)) {
       const skip = hand.find(c => c.type === 'skip');
       if (skip) return { type: 'play_card', playerId: aiPlayer.id, cardId: skip.id };
+
+      const reverse = hand.find(c => c.type === 'reverse');
+      if (reverse) return { type: 'play_card', playerId: aiPlayer.id, cardId: reverse.id };
     }
   }
 

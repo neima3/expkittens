@@ -392,6 +392,12 @@ export default function GamePage() {
         toast('Someone asked for a Favor! Tap a card to give.');
         sounds?.favor();
         break;
+      case 'imploding_kitten_place':
+        if (!skipDefuseModal) {
+          setShowDefuseModal(true);
+          toast.warning('☢️ Imploding Kitten! Choose where to place it face-up in the deck.', { duration: 4000 });
+        }
+        break;
     }
   }
 
@@ -951,9 +957,10 @@ export default function GamePage() {
     if (!defuseTimedOut || !showDefuseModal) return;
     const g = gameRef.current;
     const randomPos = g ? Math.floor(Math.random() * (g.deck.length + 1)) : 0;
+    const isIK = g?.pendingAction?.type === 'imploding_kitten_place';
     setShowDefuseModal(false);
     setDefusePosition(0);
-    sendAction({ type: 'defuse_place', position: randomPos });
+    sendAction({ type: isIK ? 'imploding_kitten_place' : 'defuse_place', position: randomPos });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defuseTimedOut]);
 
@@ -972,7 +979,12 @@ export default function GamePage() {
       setSelectedCards(prev => {
         if (prev.includes(card.id)) return prev.filter(id => id !== card.id);
         const currentType = prev.length > 0 ? myP?.hand.find(c => c.id === prev[0])?.type : null;
-        if (currentType && currentType !== card.type) return [card.id];
+        // Allow feral_cat to pair with any cat type (wildcard), and allow any cat to join a feral_cat selection
+        const isCompatible = !currentType
+          || currentType === card.type
+          || currentType === 'feral_cat'
+          || card.type === 'feral_cat';
+        if (!isCompatible) return [card.id];
         if (prev.length >= 3) return prev;
         return [...prev, card.id];
       });
@@ -1336,7 +1348,7 @@ export default function GamePage() {
         }}
         onDefusePlace={() => {
           const g = gameRef.current;
-          if (g?.pendingAction?.type === 'defuse_place') {
+          if (g?.pendingAction?.type === 'defuse_place' || g?.pendingAction?.type === 'imploding_kitten_place') {
             setShowDefuseModal(true);
           }
         }}
@@ -1539,13 +1551,13 @@ export default function GamePage() {
       <AnimatePresence>
         {showDefuseModal && game && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} className="bg-surface rounded-3xl p-6 text-center max-w-sm w-full border-2 border-success relative overflow-hidden">
+            <motion.div initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} className={`bg-surface rounded-3xl p-6 text-center max-w-sm w-full border-2 relative overflow-hidden ${game.pendingAction?.type === 'imploding_kitten_place' ? 'border-[#7B2FBE]' : 'border-success'}`}>
               {/* Countdown ring */}
               <div className="absolute top-3 right-3 w-10 h-10">
                 <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
                   <circle cx="18" cy="18" r="15.5" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
                   <circle cx="18" cy="18" r="15.5" fill="none"
-                    stroke={defuseCountdown <= 3 ? '#ff3355' : '#2bd47c'}
+                    stroke={defuseCountdown <= 3 ? '#ff3355' : (game.pendingAction?.type === 'imploding_kitten_place' ? '#aa44ff' : '#2bd47c')}
                     strokeWidth="2.5" strokeLinecap="round"
                     strokeDasharray={`${(defuseCountdown / 10) * 97.4} 97.4`}
                     className="transition-all duration-100"
@@ -1556,9 +1568,19 @@ export default function GamePage() {
                 </span>
               </div>
 
-              <p className="text-4xl mb-2">🔧💣</p>
-              <h3 className="text-xl font-bold mb-1">Defused!</h3>
-              <p className="text-sm text-text-muted mb-4">Place the Exploding Kitten back in the deck.</p>
+              {game.pendingAction?.type === 'imploding_kitten_place' ? (
+                <>
+                  <p className="text-4xl mb-2">☢️</p>
+                  <h3 className="text-xl font-bold mb-1" style={{ color: '#aa44ff' }}>Imploding Kitten!</h3>
+                  <p className="text-sm text-text-muted mb-4">Place it back <strong>face-up</strong> in the deck. Everyone can see it coming!</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-4xl mb-2">🔧💣</p>
+                  <h3 className="text-xl font-bold mb-1">Defused!</h3>
+                  <p className="text-sm text-text-muted mb-4">Place the Exploding Kitten back in the deck.</p>
+                </>
+              )}
 
               {/* Quick-pick buttons */}
               <div className="flex gap-2 mb-4">
@@ -1624,12 +1646,13 @@ export default function GamePage() {
 
               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  const isIK = gameRef.current?.pendingAction?.type === 'imploding_kitten_place';
                   if (defuseTimerRef.current) clearInterval(defuseTimerRef.current);
                   setShowDefuseModal(false);
-                  sendAction({ type: 'defuse_place', position: defusePosition });
+                  sendAction({ type: isIK ? 'imploding_kitten_place' : 'defuse_place', position: defusePosition });
                   setDefusePosition(0);
                 }}
-                className="w-full py-3 rounded-xl bg-success text-white font-bold text-base">
+                className={`w-full py-3 rounded-xl text-white font-bold text-base ${game.pendingAction?.type === 'imploding_kitten_place' ? 'bg-[#7B2FBE]' : 'bg-success'}`}>
                 Place It!
               </motion.button>
             </motion.div>
@@ -1918,10 +1941,20 @@ export default function GamePage() {
               )}
             </motion.div>
             <DangerMeter deckSize={game.deck.length} alivePlayers={alivePlayers} defuseCount={myPlayer?.hand.filter(c => c.type === 'defuse').length ?? 0} discardedEKs={discardedEKs} />
+            {game.expansionEnabled && game.playDirection === -1 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-[#1DA1F2]/20 border border-[#1DA1F2]/40 text-[#1DA1F2]"
+              >
+                <span>↺</span>
+                <span>Reversed</span>
+              </motion.div>
+            )}
           </div>
 
           {/* Desktop Turn Indicator */}
-          <div className="hidden lg:flex w-full justify-center mb-6">
+          <div className="hidden lg:flex w-full justify-center items-center gap-3 mb-6">
             <motion.div
               key={`desk-${game.currentPlayerIndex}`}
               initial={{ opacity: 0, y: -10 }}
@@ -1940,6 +1973,13 @@ export default function GamePage() {
                 </span>
               )}
             </motion.div>
+            {game.expansionEnabled && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#7B2FBE]/20 border border-[#7B2FBE]/40 text-[#cc88ff]">
+                <span>☢️</span>
+                <span>Imploding Kittens</span>
+                {game.playDirection === -1 && <span className="text-[#1DA1F2] ml-1">↺ Reversed</span>}
+              </div>
+            )}
           </div>
 
           <motion.div
@@ -1979,7 +2019,13 @@ export default function GamePage() {
           {/* Draw & Discard piles */}
           <div className="flex items-center gap-6 md:gap-10 lg:gap-20 rounded-3xl lg:rounded-[3rem] bg-surface/60 lg:bg-black/30 border border-border/70 lg:border-white/10 px-6 py-5 lg:px-12 lg:py-10 shadow-xl lg:shadow-[0_20px_40px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.05)] lg:mb-12 transition-transform">
             <div className="lg:scale-[1.3] lg:origin-center">
-              <DrawPile count={game.deck.length} onClick={drawCard} disabled={actionLoading || hasPendingAction} isMyTurn={isMyTurn} />
+              <DrawPile
+                count={game.deck.length}
+                onClick={drawCard}
+                disabled={actionLoading || hasPendingAction}
+                isMyTurn={isMyTurn}
+                implodingKittenPosition={game.deck.findIndex(c => c.faceUp && c.type === 'imploding_kitten') >= 0 ? game.deck.findIndex(c => c.faceUp && c.type === 'imploding_kitten') : null}
+              />
             </div>
             <div className="lg:scale-[1.3] lg:origin-center">
               <DiscardPile cards={game.discardPile} onPreview={setPreviewCardType} onPreviewEnd={() => setPreviewCardType(null)} />

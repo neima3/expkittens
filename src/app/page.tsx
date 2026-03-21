@@ -34,6 +34,7 @@ function HomeContent() {
   const [aiCount, setAiCount] = useState(1);
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('normal');
   const [bestOf, setBestOf] = useState<0 | 3 | 5>(0); // 0 = single match
+  const [expansionEnabled, setExpansionEnabled] = useState(false);
   const [joinCode, setJoinCode] = useState(joinParam || '');
   const [loading, setLoading] = useState(false);
   const [quickStats, setQuickStats] = useState({ gamesPlayed: 0, wins: 0, winStreak: 0 });
@@ -105,6 +106,7 @@ function HomeContent() {
             aiCount,
             aiDifficulty,
             bestOf: bestOf || undefined,
+            expansionEnabled,
           }),
         });
         const data = await res.json();
@@ -480,6 +482,35 @@ function HomeContent() {
                     First to {Math.ceil(bestOf / 2)} wins takes the series
                   </p>
                 )}
+              </div>
+
+              <div className="mb-10">
+                <label className="text-sm lg:text-base font-bold text-text-muted mb-3 block uppercase tracking-wider">Expansion Pack</label>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setExpansionEnabled(v => !v)}
+                  className={`w-full py-4 px-5 rounded-2xl text-left transition-all flex items-center gap-4 border-2 ${
+                    expansionEnabled
+                      ? 'border-[#7B2FBE] bg-[#7B2FBE]/10 shadow-[0_0_20px_rgba(123,47,190,0.2)]'
+                      : 'border-border bg-surface-light/70 text-text-muted hover:border-text-muted/50'
+                  }`}
+                >
+                  <span className="text-3xl">☢️</span>
+                  <div className="flex-1">
+                    <p className={`font-black text-sm uppercase tracking-wider mb-0.5 ${expansionEnabled ? 'text-[#a855f7]' : ''}`}>
+                      Imploding Kittens
+                    </p>
+                    <p className="text-[11px] opacity-70 leading-tight">
+                      Adds Imploding Kitten, Reverse, Draw from Bottom &amp; Feral Cat cards
+                    </p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                    expansionEnabled ? 'border-[#7B2FBE] bg-[#7B2FBE]' : 'border-border'
+                  }`}>
+                    {expansionEnabled && <span className="text-white text-xs">✓</span>}
+                  </div>
+                </motion.button>
               </div>
 
               <motion.button

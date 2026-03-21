@@ -53,6 +53,15 @@ function getCardStyle(type: CardType) {
       return { bg: 'linear-gradient(145deg, #183818 0%, #0a1f0a 60%, #041204 100%)', border: '#44cc66', glow: '#44cc66' };
     case 'potato_cat':
       return { bg: 'linear-gradient(145deg, #382c16 0%, #1c1407 60%, #0f0a02 100%)', border: '#ccaa66', glow: '#ccaa66' };
+    // Imploding Kittens expansion
+    case 'imploding_kitten':
+      return { bg: 'radial-gradient(circle at 50% 0%, #2a0050 0%, #150028 70%, #080010 100%)', border: '#9933ff', glow: '#9933ff' };
+    case 'reverse':
+      return { bg: 'linear-gradient(145deg, #082a40 0%, #041520 60%, #020a12 100%)', border: '#1da1f2', glow: '#1da1f2' };
+    case 'draw_from_bottom':
+      return { bg: 'linear-gradient(145deg, #2a1400 0%, #150900 60%, #0a0500 100%)', border: '#e67e22', glow: '#e67e22' };
+    case 'feral_cat':
+      return { bg: 'linear-gradient(145deg, #0a2a10 0%, #051507 60%, #020a03 100%)', border: '#2ecc71', glow: '#2ecc71' };
     default:
       return { bg: 'linear-gradient(145deg, #1f183b 0%, #0d0a1b 100%)', border: '#443468', glow: '#443468' };
   }
@@ -159,6 +168,13 @@ export default memo(function GameCard({
           className="absolute inset-0 rounded-[inherit] border-[3px] pointer-events-none"
           style={{ borderColor: style.glow, opacity: 0.6 }}
         />
+      )}
+
+      {/* Face-up indicator for imploding kitten */}
+      {card.faceUp && card.type === 'imploding_kitten' && (
+        <div className="absolute top-1 right-1 text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-[#9933ff]/80 text-white leading-none">
+          FACE UP
+        </div>
       )}
     </motion.button>
   );

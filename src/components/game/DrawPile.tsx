@@ -9,9 +9,10 @@ interface DrawPileProps {
   onClick: () => void;
   disabled?: boolean;
   isMyTurn: boolean;
+  implodingKittenPosition?: number | null; // position from top (0 = next card)
 }
 
-export default memo(function DrawPile({ count, onClick, disabled, isMyTurn }: DrawPileProps) {
+export default memo(function DrawPile({ count, onClick, disabled, isMyTurn, implodingKittenPosition }: DrawPileProps) {
   // Calculate thickness based on count (max 10 pixels visually)
   const thickness = Math.min(Math.max(count / 3, 2), 12);
   const { theme } = useTheme();
@@ -57,13 +58,13 @@ export default memo(function DrawPile({ count, onClick, disabled, isMyTurn }: Dr
       {/* Decorative texture */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\\'12\\' height=\\'12\\' viewBox=\\'0 0 12 12\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cpath d=\\'M0 0h12v12H0V0zm6 6h6v6H6V6zM0 6h6v6H0V6zm6-6h6v6H6V0z\\' fill=\\'%23ffffff\\' fill-opacity=\\'0.02\\' fill-rule=\\'evenodd\\'/%3E%3C/svg%3E')] pointer-events-none rounded-2xl mix-blend-overlay" />
 
-      <motion.span 
+      <motion.span
         className="text-4xl drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]"
         animate={isMyTurn && !disabled ? { y: [0, -3, 0], rotate: [0, 2, -2, 0] } : {}}
         transition={{ duration: 2, repeat: Infinity }}
       >🎴</motion.span>
       <span className="text-[11px] font-black text-white/90 tracking-wide uppercase drop-shadow-md z-10">{count} cards</span>
-      
+
       {isMyTurn && !disabled && (
         <motion.span
           animate={{ opacity: [0.4, 1, 0.4] }}
@@ -72,6 +73,18 @@ export default memo(function DrawPile({ count, onClick, disabled, isMyTurn }: Dr
         >
           DRAW
         </motion.span>
+      )}
+
+      {/* Imploding kitten face-up warning */}
+      {implodingKittenPosition != null && (
+        <motion.div
+          animate={{ opacity: [0.7, 1, 0.7], scale: [0.97, 1, 0.97] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+          className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
+          style={{ background: 'rgba(123,47,190,0.9)', color: '#e9d5ff', boxShadow: '0 0 10px rgba(153,51,255,0.6)' }}
+        >
+          ☢️ IK in {implodingKittenPosition + 1}
+        </motion.div>
       )}
     </motion.button>
   );
