@@ -33,6 +33,7 @@ export default memo(function OpponentBar({
             key={player.id}
             whileTap={isSelectable ? { scale: 0.95 } : undefined}
             onClick={() => isSelectable && onPlayerClick?.(player.id)}
+            aria-label={`${player.name}${!player.isAlive ? ', eliminated' : ''}, ${player.hand.length} cards${isCurrent && player.isAlive ? ', current turn' : ''}${isSelectable ? ', click to target' : ''}`}
             className={`flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all min-w-fit min-h-[44px] relative overflow-hidden group
               ${!player.isAlive ? 'opacity-40 border-danger/30 bg-danger/5 grayscale' : ''}
               ${isCurrent && player.isAlive ? 'border-accent bg-accent/10 shadow-[0_0_16px_rgba(255,95,46,0.3)] z-10' : 'border-white/5 bg-[#1f183b]/60 hover:bg-[#1f183b]/80'}

@@ -27,6 +27,7 @@ export default memo(function DrawPile({ count, onClick, disabled, isMyTurn, impl
       whileHover={!disabled && isMyTurn ? { scale: 1.05 } : undefined}
       onClick={onClick}
       disabled={disabled || !isMyTurn}
+      aria-label={`Draw pile, ${count} cards remaining${isMyTurn && !disabled ? '. Press to draw a card.' : ''}`}
       className={`relative w-24 h-[136px] md:w-28 md:h-40 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all
         ${isMyTurn && !disabled
           ? 'cursor-pointer hover:brightness-110 group card-shine'

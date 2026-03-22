@@ -63,7 +63,7 @@ export default memo(function DiscardPile({ cards, onPreview, onPreviewEnd }: Dis
   const prevInfo = prevCard ? CARD_INFO[prevCard.type] : null;
 
   return (
-    <div className="relative w-24 h-[136px] md:w-28 md:h-40 flex flex-col items-center justify-center">
+    <div className="relative w-24 h-[136px] md:w-28 md:h-40 flex flex-col items-center justify-center" aria-label={`Discard pile, ${cards.length} cards${topCard ? `. Top card: ${info?.name}` : ''}`}>
       {/* Base slot */}
       <div className="absolute inset-0 rounded-2xl border-2 border-white/5 border-dashed bg-black/40 flex flex-col items-center justify-center shadow-[inset_0_4px_12px_rgba(0,0,0,0.5)]">
         {!topCard && <span className="text-text-muted/50 text-xs font-bold uppercase tracking-wider">Discard</span>}

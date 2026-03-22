@@ -120,6 +120,8 @@ export default memo(function GameCard({
       whileTap={!disabled ? { scale: 0.95 } : undefined}
       onClick={!disabled ? onClick : undefined}
       disabled={disabled}
+      aria-label={`${info.name} card${selected ? ', selected' : ''}${disabled ? ', not playable' : ''}`}
+      aria-pressed={selected}
       className={`${s.w} ${s.h} ${s.r} game-card-layer relative flex flex-col items-center justify-center transition-all flex-shrink-0 overflow-hidden group
         ${selected ? 'z-20' : 'z-10'}
         ${disabled ? 'opacity-40 cursor-not-allowed grayscale-[0.3]' : 'cursor-pointer hover:-translate-y-2'}

@@ -65,7 +65,7 @@ export default function PlayerHand({ cards, selectedCards, onCardClick, disabled
 
   return (
     <div className="w-full overflow-x-auto pb-4 pt-2 px-2 bg-gradient-to-t from-[#0a0714] to-transparent scroll-touch lg:bg-transparent lg:overflow-visible">
-      <div className="flex justify-center min-w-max px-6 pb-2 lg:px-0 lg:pb-6" style={{ perspective: '1000px' }}>
+      <div role="list" aria-label={`Your hand, ${cards.length} cards`} className="flex justify-center min-w-max px-6 pb-2 lg:px-0 lg:pb-6" style={{ perspective: '1000px' }}>
         <AnimatePresence mode="popLayout">
           {sorted.map((card, i) => {
             // Calculate fan rotation
@@ -78,6 +78,7 @@ export default function PlayerHand({ cards, selectedCards, onCardClick, disabled
             return (
               <motion.div
                 key={card.id}
+                role="listitem"
                 layout
                 initial={{ opacity: 0, y: 50, rotate: 0 }}
                 animate={{

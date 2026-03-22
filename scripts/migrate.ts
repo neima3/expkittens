@@ -80,6 +80,16 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS ek_player_stats_wins_idx ON ek_player_stats(wins DESC)`;
   console.log('  ✓ ek_player_stats indexes');
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS ek_stat_submissions (
+      game_id TEXT NOT NULL,
+      player_id TEXT NOT NULL,
+      submitted_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY (game_id, player_id)
+    )
+  `;
+  console.log('  ✓ ek_stat_submissions table');
+
   console.log('Migrations complete.');
 }
 

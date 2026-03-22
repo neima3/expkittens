@@ -194,6 +194,24 @@ export async function getTopPlayerStats(limit = 20): Promise<PlayerStats[]> {
   }));
 }
 
+/**
+ * Records a stat submission for a (gameId, playerId) pair.
+ * Returns true if inserted (first submission), false if already exists (duplicate).
+ */
+export async function recordStatSubmission(gameId: string, playerId: string): Promise<boolean> {
+  const sql = getDb();
+  try {
+    await sql`
+      INSERT INTO ek_stat_submissions (game_id, player_id)
+      VALUES (${gameId}, ${playerId})
+    `;
+    return true;
+  } catch {
+    // Duplicate primary key — submission already recorded
+    return false;
+  }
+}
+
 let lastCleanup = 0;
 const CLEANUP_INTERVAL = 1000 * 60 * 60; // 1 hour
 

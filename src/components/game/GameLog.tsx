@@ -22,6 +22,9 @@ export default function GameLog({ logs, maxVisible = 50 }: GameLogProps) {
   return (
     <div
       ref={scrollRef}
+      role="log"
+      aria-label="Game log"
+      aria-live="polite"
       className="h-32 md:h-40 overflow-y-auto bg-surface/80 rounded-xl p-3 border border-border text-sm space-y-1 scroll-touch overscroll-contain"
     >
       <AnimatePresence initial={false}>
