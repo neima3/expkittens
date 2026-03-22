@@ -31,6 +31,10 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS ek_games_updated_idx ON ek_games(updated_at)`;
   console.log('  ✓ ek_games indexes');
 
+  // Optimistic concurrency: version counter for safe concurrent mutations
+  await sql`ALTER TABLE ek_games ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0`;
+  console.log('  ✓ ek_games.version column');
+
   await sql`
     CREATE TABLE IF NOT EXISTS ek_replay_shares (
       share_id TEXT PRIMARY KEY,

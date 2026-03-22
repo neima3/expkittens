@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameById, saveGame } from '@/lib/db';
+import { getGameByIdWithVersion, saveGameOptimistic } from '@/lib/db';
 import { processAction, resolveNopeWindow, getPlayerView } from '@/lib/game-engine';
 import { processAITurn, processAINopeResponses } from '@/lib/ai';
 import { emitGameUpdate } from '@/lib/game-events';
@@ -11,8 +11,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const body = await req.json();
     const { playerId, ...actionData } = body;
 
-    const game = await getGameById(id);
-    if (!game) return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    const result = await getGameByIdWithVersion(id);
+    if (!result) return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    const { game, version } = result;
     if (game.status !== 'playing') return NextResponse.json({ error: 'Game not active' }, { status: 400 });
 
     const action: GameAction = {
@@ -67,7 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    await saveGame(updatedGame);
+    const saved = await saveGameOptimistic(updatedGame, version);
+    if (!saved) {
+      return NextResponse.json({ error: 'Concurrent update detected, please retry' }, { status: 409 });
+    }
     emitGameUpdate(id);
 
     return NextResponse.json({

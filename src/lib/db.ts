@@ -20,12 +20,31 @@ function getDb() {
 export async function saveGame(game: GameState): Promise<void> {
   const sql = getDb();
   await sql`
-    INSERT INTO ek_games (id, code, state, updated_at)
-    VALUES (${game.id}, ${game.code}, ${JSON.stringify(game)}::jsonb, NOW())
+    INSERT INTO ek_games (id, code, state, updated_at, version)
+    VALUES (${game.id}, ${game.code}, ${JSON.stringify(game)}::jsonb, NOW(), 0)
     ON CONFLICT (id) DO UPDATE SET
       state = ${JSON.stringify(game)}::jsonb,
-      updated_at = NOW()
+      updated_at = NOW(),
+      version = ek_games.version + 1
   `;
+}
+
+/**
+ * Conditionally save a game only if the stored version matches expectedVersion.
+ * Returns true if the save succeeded, false if a concurrent update was detected.
+ * Use this for any route that reads then mutates game state.
+ */
+export async function saveGameOptimistic(game: GameState, expectedVersion: number): Promise<boolean> {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE ek_games SET
+      state = ${JSON.stringify(game)}::jsonb,
+      updated_at = NOW(),
+      version = version + 1
+    WHERE id = ${game.id} AND version = ${expectedVersion}
+    RETURNING id
+  ` as Record<string, unknown>[];
+  return rows.length > 0;
 }
 
 export async function getGameById(id: string): Promise<GameState | null> {
@@ -35,11 +54,25 @@ export async function getGameById(id: string): Promise<GameState | null> {
   return rows[0].state as GameState;
 }
 
+export async function getGameByIdWithVersion(id: string): Promise<{ game: GameState; version: number } | null> {
+  const sql = getDb();
+  const rows = await sql`SELECT state, version FROM ek_games WHERE id = ${id}` as Record<string, unknown>[];
+  if (rows.length === 0) return null;
+  return { game: rows[0].state as GameState, version: rows[0].version as number };
+}
+
 export async function getGameByCode(code: string): Promise<GameState | null> {
   const sql = getDb();
   const rows = await sql`SELECT state FROM ek_games WHERE code = ${code}` as Record<string, unknown>[];
   if (rows.length === 0) return null;
   return rows[0].state as GameState;
+}
+
+export async function getGameByCodeWithVersion(code: string): Promise<{ game: GameState; version: number } | null> {
+  const sql = getDb();
+  const rows = await sql`SELECT state, version FROM ek_games WHERE code = ${code}` as Record<string, unknown>[];
+  if (rows.length === 0) return null;
+  return { game: rows[0].state as GameState, version: rows[0].version as number };
 }
 
 export async function deleteOldGames(): Promise<void> {
