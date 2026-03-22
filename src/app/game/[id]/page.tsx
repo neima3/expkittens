@@ -348,12 +348,12 @@ export default function GamePage() {
     setShowPostMatchSummary(true);
     if (hasRecordedResult.current) return;
     hasRecordedResult.current = true;
-    const won = g.winnerId === playerId;
     const savedName = typeof window !== 'undefined' ? (localStorage.getItem('ek_playerName') || 'Anonymous') : 'Anonymous';
     fetch('/api/stats', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerName: savedName, won, kittensDrawn, defusesUsed, nopesPlayed, cardsPlayed: cardsPlayedCount }),
+      body: JSON.stringify({ playerName: savedName, gameId, playerId, kittensDrawn, defusesUsed, nopesPlayed, cardsPlayed: cardsPlayedCount }),
     }).catch(() => {});
+    const won = g.winnerId === playerId;
     if (won) {
       sounds?.win();
       if (!isChallengeCompletedToday()) {
