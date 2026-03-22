@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlayerStatsByName, upsertPlayerStats, getTopPlayerStats, getGameById, recordStatSubmission } from '@/lib/db';
 import type { PlayerStatsIncrement } from '@/lib/db';
+import { statsLimiter } from '@/lib/rate-limit';
 
 export interface StatsResponse {
   playerStats: {
@@ -20,22 +21,6 @@ export interface StatsResponse {
     gamesPlayed: number;
     winRate: number;
   }>;
-}
-
-// Simple in-memory rate limiter: tracks request timestamps per IP.
-// Not perfect across serverless instances but provides baseline protection.
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 10;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  const timestamps = (rateLimitMap.get(ip) ?? []).filter(t => t > cutoff);
-  if (timestamps.length >= RATE_LIMIT_MAX) return false;
-  timestamps.push(now);
-  rateLimitMap.set(ip, timestamps);
-  return true;
 }
 
 // GET /api/stats?playerName=xxx — returns player stats + all-time leaderboard
@@ -80,9 +65,8 @@ export async function GET(req: NextRequest) {
 // POST /api/stats — record game result for a player
 export async function POST(req: NextRequest) {
   try {
-    // Rate limiting: max 10 requests per minute per IP
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    if (!checkRateLimit(ip)) {
+    if (!statsLimiter.check(ip)) {
       return NextResponse.json({ ok: false, error: 'Rate limit exceeded' }, { status: 429 });
     }
 

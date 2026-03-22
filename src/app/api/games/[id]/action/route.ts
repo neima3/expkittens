@@ -3,6 +3,7 @@ import { getGameByIdWithVersion, saveGameOptimistic } from '@/lib/db';
 import { processAction, resolveNopeWindow, getPlayerView } from '@/lib/game-engine';
 import { processAITurn, processAINopeResponses } from '@/lib/ai';
 import { emitGameUpdate } from '@/lib/game-events';
+import { actionLimiter } from '@/lib/rate-limit';
 import type { GameAction } from '@/types/game';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -10,6 +11,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const body = await req.json();
     const { playerId, ...actionData } = body;
+
+    if (!playerId || !actionLimiter.check(String(playerId))) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
 
     const result = await getGameByIdWithVersion(id);
     if (!result) return NextResponse.json({ error: 'Game not found' }, { status: 404 });

@@ -189,7 +189,7 @@ export function startGame(game: GameState): GameState {
     const scores: Record<string, number> = {};
     const playerNames: Record<string, string> = {};
     for (const p of players) {
-      scores[p.name] = 0;
+      scores[p.id] = 0;
       playerNames[p.id] = p.name;
     }
     series = { ...series, scores, playerNames };
@@ -534,12 +534,13 @@ export function processAction(game: GameState, action: GameAction): GameState {
             state.status = 'finished';
             state.logs.push({ message: `🏆 ${alivePlayers[0].name} wins!`, timestamp: Date.now(), playerId: alivePlayers[0].id });
             if (state.series) {
+              const winnerId = alivePlayers[0].id;
               const winnerName = alivePlayers[0].name;
               const scores = { ...state.series.scores };
-              scores[winnerName] = (scores[winnerName] || 0) + 1;
+              scores[winnerId] = (scores[winnerId] || 0) + 1;
               const winsNeeded = Math.ceil(state.series.bestOf / 2);
-              const history = [...state.series.history, { gameId: state.id, winnerId: alivePlayers[0].id, winnerName, matchNumber: state.series.currentMatch }];
-              const seriesWinnerId = scores[winnerName] >= winsNeeded ? alivePlayers[0].id : undefined;
+              const history = [...state.series.history, { gameId: state.id, winnerId, winnerName, matchNumber: state.series.currentMatch }];
+              const seriesWinnerId = scores[winnerId] >= winsNeeded ? winnerId : undefined;
               state.series = { ...state.series, scores, history, seriesWinnerId };
             }
           } else {
@@ -581,17 +582,18 @@ export function processAction(game: GameState, action: GameAction): GameState {
 
             // Update series state
             if (state.series) {
+              const winnerId = alivePlayers[0].id;
               const winnerName = alivePlayers[0].name;
               const scores = { ...state.series.scores };
-              scores[winnerName] = (scores[winnerName] || 0) + 1;
+              scores[winnerId] = (scores[winnerId] || 0) + 1;
               const winsNeeded = Math.ceil(state.series.bestOf / 2);
               const history = [...state.series.history, {
                 gameId: state.id,
-                winnerId: alivePlayers[0].id,
+                winnerId,
                 winnerName,
                 matchNumber: state.series.currentMatch,
               }];
-              const seriesWinnerId = scores[winnerName] >= winsNeeded ? alivePlayers[0].id : undefined;
+              const seriesWinnerId = scores[winnerId] >= winsNeeded ? winnerId : undefined;
               state.series = { ...state.series, scores, history, seriesWinnerId };
 
               if (seriesWinnerId) {

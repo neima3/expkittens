@@ -190,8 +190,7 @@ export default function PostMatchSummary({
             {series && (() => {
               const winsNeeded = Math.ceil(series.bestOf / 2);
               const seriesOver = !!series.seriesWinnerId;
-              const myName = playerId && series.playerNames[playerId];
-              const iAmSeriesWinner = seriesOver && myName && series.scores[myName] >= winsNeeded;
+              const iAmSeriesWinner = seriesOver && playerId && (series.scores[playerId] ?? 0) >= winsNeeded;
 
               return (
                 <motion.div
@@ -214,7 +213,7 @@ export default function PostMatchSummary({
                   <div className="space-y-2 mb-3">
                     {players.map(p => {
                       const name = series.playerNames[p.id] || p.name;
-                      const wins = series.scores[name] || 0;
+                      const wins = series.scores[p.id] || 0;
                       const isSeriesChamp = seriesOver && wins >= winsNeeded;
                       return (
                         <div key={p.id} className="flex items-center gap-2">

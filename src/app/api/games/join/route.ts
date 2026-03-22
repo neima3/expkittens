@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGameByCodeWithVersion, saveGameOptimistic } from '@/lib/db';
 import { nanoid } from 'nanoid';
+import { joinLimiter } from '@/lib/rate-limit';
 
 const MAX_JOIN_RETRIES = 5;
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!joinLimiter.check(ip)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
+
     const body = await req.json();
     const { code, playerName, avatar = 0 } = body;
 

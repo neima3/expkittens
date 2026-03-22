@@ -71,9 +71,7 @@ function getActionHint(opts: {
 
 function SeriesScoreBar({ series, players, compact }: { series: SeriesState; players: Player[]; compact?: boolean }) {
   const winsNeeded = Math.ceil(series.bestOf / 2);
-  const matchPointNames = Object.entries(series.scores)
-    .filter(([, wins]) => wins === winsNeeded - 1)
-    .map(([name]) => name);
+  const hasMatchPoint = Object.values(series.scores).some(wins => wins === winsNeeded - 1);
 
   if (compact) {
     return (
@@ -81,13 +79,16 @@ function SeriesScoreBar({ series, players, compact }: { series: SeriesState; pla
         <span className="font-bold text-warning">Bo{series.bestOf}</span>
         <span className="text-text-muted">G{series.currentMatch}</span>
         <div className="flex gap-1.5">
-          {Object.entries(series.scores).map(([name, wins]) => (
-            <span key={name} className={`font-bold ${wins === winsNeeded - 1 ? 'text-danger' : 'text-text'}`}>
-              {name.slice(0, 6)}:{wins}
-            </span>
-          ))}
+          {Object.entries(series.scores).map(([playerId, wins]) => {
+            const name = series.playerNames[playerId] || playerId;
+            return (
+              <span key={playerId} className={`font-bold ${wins === winsNeeded - 1 ? 'text-danger' : 'text-text'}`}>
+                {name.slice(0, 6)}:{wins}
+              </span>
+            );
+          })}
         </div>
-        {matchPointNames.length > 0 && <span className="text-danger font-black animate-pulse">MP</span>}
+        {hasMatchPoint && <span className="text-danger font-black animate-pulse">MP</span>}
       </div>
     );
   }
@@ -104,7 +105,7 @@ function SeriesScoreBar({ series, players, compact }: { series: SeriesState; pla
         <div className="flex gap-3">
           {players.filter(p => !p.isAI || series.playerNames[p.id]).map(p => {
             const name = series.playerNames[p.id] || p.name;
-            const wins = series.scores[name] || 0;
+            const wins = series.scores[p.id] || 0;
             const isMatchPoint = wins === winsNeeded - 1;
             return (
               <div key={p.id} className="flex items-center gap-1.5">
