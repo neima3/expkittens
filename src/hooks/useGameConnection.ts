@@ -4,6 +4,23 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { MutableRefObject } from 'react';
 import type { GameState } from '@/types/game';
 
+/**
+ * Adjusts pendingAction.expiresAt from server epoch to client epoch using the
+ * serverNow timestamp included in the response. This corrects countdown drift
+ * caused by client/server clock skew.
+ */
+function applyClockOffset(game: GameState, serverNow: number | undefined, receivedAt: number): GameState {
+  if (!serverNow || !game.pendingAction?.expiresAt) return game;
+  const clockOffset = receivedAt - serverNow;
+  return {
+    ...game,
+    pendingAction: {
+      ...game.pendingAction,
+      expiresAt: game.pendingAction.expiresAt + clockOffset,
+    },
+  };
+}
+
 interface UseGameConnectionOptions {
   gameId: string;
   /** Current player's ID — empty string for spectators */
@@ -46,9 +63,11 @@ export function useGameConnection({
         `/api/games/${gameId}/poll?${idParam}&lastActionId=${lastActionIdRef.current}`,
         { signal: controller.signal }
       );
-      const data = await res.json();
+      const receivedAt = Date.now();
+      const data = await res.json() as { changed?: boolean; game?: GameState; lastActionId?: number; serverNow?: number };
       if (!data.changed || !data.game) return;
-      onUpdateRef.current(data.game, data.lastActionId ?? lastActionIdRef.current);
+      const game = applyClockOffset(data.game, data.serverNow, receivedAt);
+      onUpdateRef.current(game, data.lastActionId ?? lastActionIdRef.current);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
     }
@@ -65,15 +84,18 @@ export function useGameConnection({
       esRef.current = es;
 
       es.onmessage = (ev) => {
+        const receivedAt = Date.now();
         try {
           const data = JSON.parse(ev.data as string) as {
             game?: GameState;
             lastActionId?: number;
+            serverNow?: number;
             error?: string;
           };
           if (!data.game) return;
           if (data.lastActionId !== undefined && data.lastActionId <= lastActionIdRef.current) return;
-          onUpdateRef.current(data.game, data.lastActionId ?? lastActionIdRef.current);
+          const game = applyClockOffset(data.game, data.serverNow, receivedAt);
+          onUpdateRef.current(game, data.lastActionId ?? lastActionIdRef.current);
         } catch {
           // ignore parse errors
         }

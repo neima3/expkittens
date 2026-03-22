@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           else if (playerId) viewGame = getPlayerView(game, playerId);
           else viewGame = game;
 
-          send({ game: viewGame, lastActionId: game.lastActionId });
+          send({ game: viewGame, lastActionId: game.lastActionId, serverNow: Date.now() });
         } catch (err) {
           if (!closed) console.error('SSE push error:', err);
         }

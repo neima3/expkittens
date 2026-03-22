@@ -54,6 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       changed: true,
       game: viewGame,
       lastActionId: game.lastActionId,
+      serverNow: Date.now(),
     });
   } catch (error: unknown) {
     console.error('Poll error:', error);
