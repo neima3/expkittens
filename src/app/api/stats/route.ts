@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPlayerStatsByName, upsertPlayerStats, getTopPlayerStats, getGameById, recordStatSubmission } from '@/lib/db';
+import { getPlayerStatsByPid, getPlayerStatsByName, upsertPlayerStats, getTopPlayerStats, getGameById, recordStatSubmission, upsertLeaderboard } from '@/lib/db';
 import type { PlayerStatsIncrement } from '@/lib/db';
 import { statsLimiter } from '@/lib/rate-limit';
+
+/** Returns the Monday of the current week as a YYYY-MM-DD string. */
+function currentWeekStart(): string {
+  const now = new Date();
+  const diff = (now.getUTCDay() + 6) % 7;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() - diff);
+  return monday.toISOString().split('T')[0];
+}
 
 export interface StatsResponse {
   playerStats: {
@@ -23,13 +32,19 @@ export interface StatsResponse {
   }>;
 }
 
-// GET /api/stats?playerName=xxx — returns player stats + all-time leaderboard
+// GET /api/stats?playerId=xxx  — lookup by stable persistentId (preferred)
+// GET /api/stats?playerName=xxx — legacy name-based lookup (fallback)
 export async function GET(req: NextRequest) {
   try {
+    const persistentId = req.nextUrl.searchParams.get('playerId')?.trim() || '';
     const playerName = req.nextUrl.searchParams.get('playerName')?.trim() || '';
 
     const [playerStats, topPlayers] = await Promise.all([
-      playerName ? getPlayerStatsByName(playerName) : Promise.resolve(null),
+      persistentId
+        ? getPlayerStatsByPid(persistentId)
+        : playerName
+          ? getPlayerStatsByName(playerName)
+          : Promise.resolve(null),
       getTopPlayerStats(20),
     ]);
 
@@ -63,6 +78,8 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/stats — record game result for a player
+// Requires: gameId, playerId (in-game), persistentId (stable browser identity)
+// persistentId is verified against the player record stored in game state at join time.
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
@@ -71,23 +88,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json() as {
-      playerName?: string;
+      persistentId?: string;
       gameId?: string;
       playerId?: string;
-      won?: boolean;
       kittensDrawn?: number;
       defusesUsed?: number;
       nopesPlayed?: number;
       cardsPlayed?: number;
     };
 
-    const name = (body.playerName ?? '').trim().slice(0, 32);
-    if (!name) {
-      return NextResponse.json({ ok: false, error: 'playerName required' }, { status: 400 });
-    }
-
     const gameId = (body.gameId ?? '').trim();
     const playerId = (body.playerId ?? '').trim();
+    const persistentId = (body.persistentId ?? '').trim();
+
     if (!gameId || !playerId) {
       return NextResponse.json({ ok: false, error: 'gameId and playerId required' }, { status: 400 });
     }
@@ -107,6 +120,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Player not found in game' }, { status: 403 });
     }
 
+    // Verify persistentId against game state if it was recorded at join time.
+    // If the game has a persistentId for this player, the submission MUST match.
+    // Games without persistentId (old games or solo play) accept the submission
+    // using the persistentId provided by the client (or fall back to playerId).
+    if (player.persistentId && persistentId !== player.persistentId) {
+      return NextResponse.json({ ok: false, error: 'Identity mismatch' }, { status: 403 });
+    }
+
+    // Stable identity key: prefer persistentId from game state, then from request, then fallback to in-game playerId
+    const stableId = player.persistentId ?? (persistentId || `fallback_${playerId}`);
+
     // One-submission-per-game-per-player constraint
     const recorded = await recordStatSubmission(gameId, playerId);
     if (!recorded) {
@@ -115,6 +139,9 @@ export async function POST(req: NextRequest) {
 
     // Derive won from actual game result — never trust client-provided value
     const won = game.winnerId === playerId;
+
+    // Get display name from verified game state, not from client
+    const displayName = player.name;
 
     const inc: PlayerStatsIncrement = {
       gamesPlayed: 1,
@@ -126,7 +153,13 @@ export async function POST(req: NextRequest) {
       cardsPlayed: Math.max(0, body.cardsPlayed ?? 0),
     };
 
-    await upsertPlayerStats(name, inc);
+    await upsertPlayerStats(stableId, displayName, inc);
+
+    // Update weekly leaderboard server-side (no separate client call needed)
+    if (won) {
+      await upsertLeaderboard(stableId, displayName, currentWeekStart());
+    }
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Stats POST error:', err);

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { AVATARS } from '@/types/game';
 import type { Room } from '@/lib/rooms-db';
+import { getPersistentId } from '@/lib/identity';
 
 function LobbyContent() {
   const router = useRouter();
@@ -60,7 +61,7 @@ function LobbyContent() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: playerName.trim(), avatar, isPublic }),
+        body: JSON.stringify({ playerName: playerName.trim(), avatar, isPublic, persistentId: getPersistentId() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

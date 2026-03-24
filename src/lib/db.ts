@@ -132,7 +132,12 @@ export interface PlayerStatsIncrement {
   cardsPlayed?: number;
 }
 
-export async function upsertPlayerStats(playerName: string, inc: PlayerStatsIncrement): Promise<void> {
+/**
+ * Upsert player stats keyed by stable persistentId.
+ * The display name is stored alongside but does NOT affect the row identity.
+ * If the player renames, the next upsert updates player_name without splitting history.
+ */
+export async function upsertPlayerStats(persistentId: string, playerName: string, inc: PlayerStatsIncrement): Promise<void> {
   const sql = getDb();
   const gp = inc.gamesPlayed ?? 0;
   const w = inc.wins ?? 0;
@@ -142,9 +147,10 @@ export async function upsertPlayerStats(playerName: string, inc: PlayerStatsIncr
   const np = inc.nopesPlayed ?? 0;
   const cp = inc.cardsPlayed ?? 0;
   await sql`
-    INSERT INTO ek_player_stats (player_name, games_played, wins, losses, kittens_drawn, defuses_used, nopes_played, cards_played, updated_at)
-    VALUES (${playerName}, ${gp}, ${w}, ${l}, ${kd}, ${du}, ${np}, ${cp}, NOW())
-    ON CONFLICT (player_name) DO UPDATE SET
+    INSERT INTO ek_player_stats (player_id, player_name, games_played, wins, losses, kittens_drawn, defuses_used, nopes_played, cards_played, updated_at)
+    VALUES (${persistentId}, ${playerName}, ${gp}, ${w}, ${l}, ${kd}, ${du}, ${np}, ${cp}, NOW())
+    ON CONFLICT (player_id) DO UPDATE SET
+      player_name   = ${playerName},
       games_played  = ek_player_stats.games_played  + ${gp},
       wins          = ek_player_stats.wins          + ${w},
       losses        = ek_player_stats.losses        + ${l},
@@ -156,11 +162,7 @@ export async function upsertPlayerStats(playerName: string, inc: PlayerStatsIncr
   `;
 }
 
-export async function getPlayerStatsByName(playerName: string): Promise<PlayerStats | null> {
-  const sql = getDb();
-  const rows = await sql`SELECT * FROM ek_player_stats WHERE player_name = ${playerName}` as Record<string, unknown>[];
-  if (rows.length === 0) return null;
-  const r = rows[0];
+function rowToPlayerStats(r: Record<string, unknown>): PlayerStats {
   return {
     playerName: r.player_name as string,
     gamesPlayed: r.games_played as number,
@@ -174,6 +176,22 @@ export async function getPlayerStatsByName(playerName: string): Promise<PlayerSt
   };
 }
 
+/** Look up stats by stable persistentId. */
+export async function getPlayerStatsByPid(persistentId: string): Promise<PlayerStats | null> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM ek_player_stats WHERE player_id = ${persistentId}` as Record<string, unknown>[];
+  if (rows.length === 0) return null;
+  return rowToPlayerStats(rows[0]);
+}
+
+/** Legacy lookup by display name (used for GET ?playerName= queries without persistentId). */
+export async function getPlayerStatsByName(playerName: string): Promise<PlayerStats | null> {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM ek_player_stats WHERE player_name = ${playerName} ORDER BY wins DESC LIMIT 1` as Record<string, unknown>[];
+  if (rows.length === 0) return null;
+  return rowToPlayerStats(rows[0]);
+}
+
 export async function getTopPlayerStats(limit = 20): Promise<PlayerStats[]> {
   const sql = getDb();
   const rows = await sql`
@@ -181,17 +199,20 @@ export async function getTopPlayerStats(limit = 20): Promise<PlayerStats[]> {
     ORDER BY wins DESC, games_played DESC
     LIMIT ${limit}
   ` as Record<string, unknown>[];
-  return rows.map(r => ({
-    playerName: r.player_name as string,
-    gamesPlayed: r.games_played as number,
-    wins: r.wins as number,
-    losses: r.losses as number,
-    kittensDrawn: r.kittens_drawn as number,
-    defusesUsed: r.defuses_used as number,
-    nopesPlayed: r.nopes_played as number,
-    cardsPlayed: r.cards_played as number,
-    updatedAt: r.updated_at as string,
-  }));
+  return rows.map(rowToPlayerStats);
+}
+
+/** Upsert weekly leaderboard keyed by stable persistentId. */
+export async function upsertLeaderboard(persistentId: string, playerName: string, weekStart: string): Promise<void> {
+  const sql = getDb();
+  await sql`
+    INSERT INTO ek_leaderboard (player_id, player_name, week_start, wins, updated_at)
+    VALUES (${persistentId}, ${playerName}, ${weekStart}, 1, NOW())
+    ON CONFLICT (player_id, week_start) DO UPDATE SET
+      player_name = ${playerName},
+      wins        = ek_leaderboard.wins + 1,
+      updated_at  = NOW()
+  `;
 }
 
 /**

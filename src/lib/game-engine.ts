@@ -91,6 +91,7 @@ export function createGame(options: {
   hostId: string;
   hostName: string;
   hostAvatar: number;
+  hostPersistentId?: string;
   isMultiplayer: boolean;
   aiCount?: number;
   aiDifficulty?: AIDifficulty;
@@ -102,6 +103,7 @@ export function createGame(options: {
   const players: Player[] = [
     {
       id: options.hostId,
+      persistentId: options.hostPersistentId,
       name: options.hostName,
       hand: [],
       isAlive: true,

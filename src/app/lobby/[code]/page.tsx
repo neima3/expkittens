@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { AVATARS } from '@/types/game';
 import type { Room, RoomPlayer } from '@/lib/rooms-db';
+import { getPersistentId } from '@/lib/identity';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -213,7 +214,7 @@ export default function RoomPage() {
       const res = await fetch(`/api/rooms/${code}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: playerName.trim(), avatar }),
+        body: JSON.stringify({ playerName: playerName.trim(), avatar, persistentId: getPersistentId() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

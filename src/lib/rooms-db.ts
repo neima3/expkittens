@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 
 export interface RoomPlayer {
   id: string;
+  persistentId?: string; // stable browser-local identity passed at join time
   name: string;
   avatar: number;
   isReady: boolean;

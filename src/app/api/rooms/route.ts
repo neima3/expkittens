@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     void maybeCleanupOldRooms();
 
     const body = await req.json();
-    const { playerName, avatar = 0, isPublic = false } = body;
+    const { playerName, avatar = 0, isPublic = false, persistentId } = body;
 
     if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       players: [
         {
           id: playerId,
+          persistentId: typeof persistentId === 'string' ? persistentId.slice(0, 36) : undefined,
           name: playerName.trim().slice(0, 20),
           avatar: Number(avatar) || 0,
           isReady: true, // host is auto-ready

@@ -44,26 +44,7 @@ export async function GET() {
     return NextResponse.json({ weekStart: currentWeekStart(), entries: [] });
   }
 }
-
-// POST /api/leaderboard — record a win for the given player
-export async function POST(req: Request) {
-  try {
-    const { playerName } = await req.json() as { playerName?: string };
-    const name = (playerName ?? '').trim().slice(0, 32);
-    if (!name) return NextResponse.json({ ok: false, error: 'playerName required' }, { status: 400 });
-
-    const sql = getDb();
-    const weekStart = currentWeekStart();
-    await sql`
-      INSERT INTO ek_leaderboard (player_name, week_start, wins, updated_at)
-      VALUES (${name}, ${weekStart}, 1, NOW())
-      ON CONFLICT (player_name, week_start) DO UPDATE SET
-        wins = ek_leaderboard.wins + 1,
-        updated_at = NOW()
-    `;
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('Leaderboard POST error:', err);
-    return NextResponse.json({ ok: false }, { status: 500 });
-  }
-}
+// NOTE: Leaderboard writes are now handled server-side in POST /api/stats after
+// verifying the player's identity against the finished game state.
+// The previous unauthenticated POST endpoint has been removed to prevent
+// arbitrary name injection and leaderboard manipulation.

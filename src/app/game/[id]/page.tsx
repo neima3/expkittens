@@ -41,6 +41,7 @@ import { getTodayChallenge, isChallengeCompletedToday, checkChallengeCondition, 
 import { processNewGameState } from '@/lib/processGameState';
 import { useGameConnection } from '@/hooks/useGameConnection';
 import { useGameAnimations } from '@/hooks/useGameAnimations';
+import { getPersistentId } from '@/lib/identity';
 
 function isCatCard(type: CardType): boolean {
   return CAT_CARD_TYPES.includes(type);
@@ -349,11 +350,13 @@ export default function GamePage() {
     setShowPostMatchSummary(true);
     if (hasRecordedResult.current) return;
     hasRecordedResult.current = true;
-    const savedName = typeof window !== 'undefined' ? (localStorage.getItem('ek_playerName') || 'Anonymous') : 'Anonymous';
+    // Pass persistent browser identity so the server can key stats stably.
+    // playerName and won are derived server-side from the verified game state.
     fetch('/api/stats', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerName: savedName, gameId, playerId, kittensDrawn, defusesUsed, nopesPlayed, cardsPlayed: cardsPlayedCount }),
+      body: JSON.stringify({ persistentId: getPersistentId(), gameId, playerId, kittensDrawn, defusesUsed, nopesPlayed, cardsPlayed: cardsPlayedCount }),
     }).catch(() => {});
+    // Leaderboard is now updated server-side inside /api/stats when won === true.
     const won = g.winnerId === playerId;
     if (won) {
       sounds?.win();
@@ -366,10 +369,6 @@ export default function GamePage() {
         }
       }
       applyProgressUpdate(recordWin());
-      fetch('/api/leaderboard', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: savedName }),
-      }).catch(() => {});
       setTimeout(() => { if (confettiRef.current) launchConfetti(confettiRef.current); }, 300);
     } else {
       sounds?.lose();

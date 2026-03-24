@@ -29,6 +29,7 @@ export type AIDifficulty = 'easy' | 'normal' | 'hard' | 'ruthless';
 
 export interface Player {
   id: string;
+  persistentId?: string; // stable browser-local identity, carried across rematch games
   name: string;
   hand: Card[];
   isAlive: boolean;

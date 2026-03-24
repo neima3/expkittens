@@ -80,6 +80,24 @@ async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS ek_player_stats_wins_idx ON ek_player_stats(wins DESC)`;
   console.log('  ✓ ek_player_stats indexes');
 
+  // --- Migration: stable player_id identity for ek_player_stats ---
+  // Add player_id column (nullable to allow backfill of existing rows)
+  await sql`ALTER TABLE ek_player_stats ADD COLUMN IF NOT EXISTS player_id TEXT`;
+  console.log('  ✓ ek_player_stats.player_id column');
+
+  // Backfill existing name-keyed rows with deterministic legacy IDs
+  // Uses md5(player_name) which is stable and built-in to Postgres.
+  await sql`
+    UPDATE ek_player_stats
+    SET player_id = 'legacy_' || md5(player_name)
+    WHERE player_id IS NULL
+  `;
+  console.log('  ✓ ek_player_stats.player_id backfill');
+
+  // Unique index — used as the ON CONFLICT target for new upserts
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS ek_player_stats_player_id_idx ON ek_player_stats(player_id)`;
+  console.log('  ✓ ek_player_stats.player_id unique index');
+
   await sql`
     CREATE TABLE IF NOT EXISTS ek_stat_submissions (
       game_id TEXT NOT NULL,
@@ -89,6 +107,21 @@ async function migrate() {
     )
   `;
   console.log('  ✓ ek_stat_submissions table');
+
+  // --- Migration: stable player_id identity for ek_leaderboard ---
+  await sql`ALTER TABLE ek_leaderboard ADD COLUMN IF NOT EXISTS player_id TEXT`;
+  console.log('  ✓ ek_leaderboard.player_id column');
+
+  await sql`
+    UPDATE ek_leaderboard
+    SET player_id = 'legacy_' || md5(player_name)
+    WHERE player_id IS NULL
+  `;
+  console.log('  ✓ ek_leaderboard.player_id backfill');
+
+  // Composite unique index on (player_id, week_start) — ON CONFLICT target for new upserts
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS ek_leaderboard_player_week_idx ON ek_leaderboard(player_id, week_start)`;
+  console.log('  ✓ ek_leaderboard.player_id unique index');
 
   console.log('Migrations complete.');
 }

@@ -44,6 +44,7 @@ export async function POST(
       hostId: host.id,
       hostName: host.name,
       hostAvatar: host.avatar,
+      hostPersistentId: host.persistentId,
       isMultiplayer: true,
       aiCount: 0,
       expansionEnabled: expansionEnabled === true,
@@ -54,6 +55,7 @@ export async function POST(
       if (rp.id === host.id) continue;
       game.players.push({
         id: rp.id,
+        persistentId: rp.persistentId,
         name: rp.name,
         hand: [],
         isAlive: true,

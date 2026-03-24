@@ -10,7 +10,7 @@ export async function POST(
     await initializeRoomsTable();
     const { code } = await params;
     const body = await req.json();
-    const { playerName, avatar = 0 } = body;
+    const { playerName, avatar = 0, persistentId } = body;
 
     if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
       return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
@@ -32,6 +32,7 @@ export async function POST(
     const playerId = nanoid(12);
     room.players.push({
       id: playerId,
+      persistentId: typeof persistentId === 'string' ? persistentId.slice(0, 36) : undefined,
       name: playerName.trim().slice(0, 20),
       avatar: Number(avatar) || 0,
       isReady: false,
