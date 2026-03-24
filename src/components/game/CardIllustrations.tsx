@@ -673,6 +673,13 @@ export function CardIllustration({ type, className = '' }: CardIllustrationProps
     reverse: <ReverseSVG />,
     draw_from_bottom: <DrawFromBottomSVG />,
     feral_cat: <FeralCatSVG />,
+    streaking_kitten: (
+      <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+        <circle cx="60" cy="60" r="55" fill="#fef3c7" stroke="#f59e0b" strokeWidth="3"/>
+        <text x="60" y="75" textAnchor="middle" fontSize="52">💨</text>
+        <text x="60" y="110" textAnchor="middle" fontSize="12" fill="#92400e" fontWeight="bold">SHIELD</text>
+      </svg>
+    ),
   };
 
   return (

@@ -134,6 +134,14 @@ const CARD_DETAILS: Record<CardType, {
     category: 'CAT CARD',
     danger: 'medium',
   },
+  // Streaking Kittens expansion
+  streaking_kitten: {
+    tip: 'Hold this in your hand as a passive shield. If you draw an Exploding Kitten and have no Defuse, the Streaking Kitten auto-activates: it\'s discarded and the EK is shuffled back into the deck. Defuse still takes priority when you have both.',
+    nopeable: false,
+    quantity: '4 in the deck (Streaking Kittens expansion)',
+    category: 'Lifesaver',
+    danger: 'low',
+  },
 };
 
 const ALL_CARDS: CardType[] = [
@@ -142,6 +150,8 @@ const ALL_CARDS: CardType[] = [
   'taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat',
   // Imploding Kittens expansion
   'imploding_kitten', 'reverse', 'draw_from_bottom', 'feral_cat',
+  // Streaking Kittens expansion
+  'streaking_kitten',
 ];
 
 const CATEGORIES = ['All', 'Action', 'Cat Card', 'Counter', 'Danger', 'Lifesaver'] as const;

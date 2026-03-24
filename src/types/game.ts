@@ -15,7 +15,8 @@ export type CardType =
   | 'beard_cat'
   | 'cattermelon'
   | 'potato_cat'
-  | 'feral_cat';
+  | 'feral_cat'
+  | 'streaking_kitten';
 
 export interface Card {
   id: string;
@@ -113,7 +114,10 @@ export interface GameState {
   hostId: string;
   lastActionId: number;
   // Expansion fields
+  /** @deprecated Use enabledPacks instead */
   expansionEnabled?: boolean;
+  /** IDs of enabled expansion packs (see src/lib/expansion-packs.ts) */
+  enabledPacks?: string[];
   playDirection: 1 | -1; // 1 = forward (default), -1 = reversed
   // Rematch fields (multiplayer)
   rematchRequests?: string[]; // player IDs who want a rematch
@@ -123,6 +127,10 @@ export interface GameState {
   series?: SeriesState;
   // Spectator fields
   spectators?: Spectator[];
+  // Structured action history (for turn transcript & action stack inspector)
+  actionLog?: ActionRecord[];
+  /** Monotonically increasing turn counter; increments when active player changes */
+  currentTurnNumber?: number;
 }
 
 export const CARD_INFO: Record<CardType, { name: string; description: string; emoji: string; color: string }> = {
@@ -229,13 +237,67 @@ export const CARD_INFO: Record<CardType, { name: string; description: string; em
     emoji: '😾',
     color: '#2ECC71',
   },
+  // Streaking Kittens expansion
+  streaking_kitten: {
+    name: 'Streaking Kitten',
+    description: 'Hold this in your hand to automatically survive the next Exploding Kitten you draw — no Defuse needed. The Streaking Kitten is spent when it shields you.',
+    emoji: '💨',
+    color: '#f59e0b',
+  },
 };
 
 export const CAT_CARD_TYPES: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat', 'feral_cat'];
 export const ACTION_CARD_TYPES: CardType[] = ['attack', 'skip', 'favor', 'shuffle', 'see_the_future', 'nope', 'reverse', 'draw_from_bottom'];
-export const EXPANSION_CARD_TYPES: CardType[] = ['imploding_kitten', 'reverse', 'draw_from_bottom', 'feral_cat'];
+/** @deprecated Use EXPANSION_PACKS from expansion-packs.ts for pack-level queries */
+export const EXPANSION_CARD_TYPES: CardType[] = ['imploding_kitten', 'reverse', 'draw_from_bottom', 'feral_cat', 'streaking_kitten'];
 
 export const AVATARS = ['😼', '😸', '🙀', '😻', '😹', '😾', '😺', '😿'] as const;
+
+// ---------------------------------------------------------------------------
+// Action log — structured record of every in-game event
+// ---------------------------------------------------------------------------
+
+export type ActionRecordType =
+  | 'card_played'       // Player played a card (action card or cat combo)
+  | 'nope_played'       // Player played a Nope during a nope window
+  | 'nope_pass'         // Player explicitly passed during a nope window
+  | 'nope_resolved'     // Nope window closed: records full chain + outcome
+  | 'draw'              // Player drew a card from the deck
+  | 'defuse'            // Player defused an Exploding Kitten
+  | 'implode_place'     // Player placed Imploding Kitten face-up
+  | 'favor_give'        // Player gave a card via Favor
+  | 'steal'             // Player's cat-pair/triple steal resolved
+  | 'explosion'         // Player exploded (no defuse)
+  | 'implode'           // Player imploded
+  | 'game_start'        // Game started
+  | 'game_end';         // Game finished
+
+export interface ActionRecord {
+  /** Monotonically increasing within this game */
+  seq: number;
+  /** Which player turn this happened in (increments when active player changes) */
+  turnNumber: number;
+  timestamp: number;
+  type: ActionRecordType;
+  playerId: string;
+  playerName: string;
+  /** Card type played / drawn / involved */
+  cardType?: CardType;
+  /** For pair (2) or triple (3) plays */
+  cardCount?: number;
+  /** Target player for favor / steal / attack */
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  // Nope window resolution fields (populated on 'nope_resolved')
+  nopeChain?: Array<{ playerId: string; playerName: string }>;
+  nopedCardType?: CardType;
+  outcome?: 'executed' | 'noped';
+  // Private fields — redacted for spectators and non-participant players
+  /** Type of card stolen (hidden to everyone except thief and victim) */
+  stolenCardType?: CardType;
+  /** Type of card given via Favor (hidden to everyone except giver and receiver) */
+  givenCardType?: CardType;
+}
 
 export const AI_DIFFICULTY_INFO: Record<AIDifficulty, { label: string; emoji: string; color: string; description: string }> = {
   easy: { label: 'Kitten', emoji: '😺', color: '#4ade80', description: 'Plays randomly — still learning how to cat' },

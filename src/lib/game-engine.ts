@@ -7,7 +7,38 @@ import type {
   Player,
   SeriesState,
   AIDifficulty,
+  ActionRecord,
 } from '@/types/game';
+import { getPackById, normalizePacks } from '@/lib/expansion-packs';
+
+// ---------------------------------------------------------------------------
+// Action recording helpers
+// ---------------------------------------------------------------------------
+
+function nextSeq(state: GameState): number {
+  return (state.actionLog?.length ?? 0) + 1;
+}
+
+function pushAction(state: GameState, record: Omit<ActionRecord, 'seq' | 'turnNumber' | 'timestamp'>): void {
+  const entry: ActionRecord = {
+    seq: nextSeq(state),
+    turnNumber: state.currentTurnNumber ?? 1,
+    timestamp: Date.now(),
+    ...record,
+  };
+  if (!state.actionLog) state.actionLog = [];
+  state.actionLog.push(entry);
+}
+
+/**
+ * If the active player index changed vs. the snapshot taken before an action,
+ * bump the turn counter so the next action is attributed to the new turn.
+ */
+function maybeBumpTurnNumber(state: GameState, startPlayerIndex: number): void {
+  if (state.currentPlayerIndex !== startPlayerIndex && state.status === 'playing') {
+    state.currentTurnNumber = (state.currentTurnNumber ?? 1) + 1;
+  }
+}
 
 function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
@@ -22,50 +53,42 @@ function createCard(type: CardType): Card {
   return { id: nanoid(8), type };
 }
 
-function buildDeck(playerCount: number, expansionEnabled?: boolean): { deck: Card[]; playerHands: Card[][] } {
+function buildDeck(playerCount: number, enabledPacks: string[]): { deck: Card[]; playerHands: Card[][] } {
   const cards: Card[] = [];
 
-  // 4 Attack cards
+  // Base deck
   for (let i = 0; i < 4; i++) cards.push(createCard('attack'));
-  // 4 Skip cards
   for (let i = 0; i < 4; i++) cards.push(createCard('skip'));
-  // 4 Favor cards
   for (let i = 0; i < 4; i++) cards.push(createCard('favor'));
-  // 4 Shuffle cards
   for (let i = 0; i < 4; i++) cards.push(createCard('shuffle'));
-  // 5 See the Future cards
   for (let i = 0; i < 5; i++) cards.push(createCard('see_the_future'));
-  // 5 Nope cards
   for (let i = 0; i < 5; i++) cards.push(createCard('nope'));
-  // 4 of each base cat card = 20 cat cards
   const catTypes: CardType[] = ['taco_cat', 'rainbow_cat', 'beard_cat', 'cattermelon', 'potato_cat'];
   for (const catType of catTypes) {
     for (let i = 0; i < 4; i++) cards.push(createCard(catType));
   }
 
-  // Imploding Kittens expansion cards
-  if (expansionEnabled) {
-    // 4 Reverse cards
-    for (let i = 0; i < 4; i++) cards.push(createCard('reverse'));
-    // 4 Draw from the Bottom cards
-    for (let i = 0; i < 4; i++) cards.push(createCard('draw_from_bottom'));
-    // 4 Feral Cat cards
-    for (let i = 0; i < 4; i++) cards.push(createCard('feral_cat'));
+  // Add cards from each enabled expansion pack
+  for (const packId of enabledPacks) {
+    const pack = getPackById(packId);
+    if (!pack) continue;
+    for (const { type, count } of pack.deckCards) {
+      for (let i = 0; i < count; i++) cards.push(createCard(type));
+    }
   }
 
-  // Shuffle the deck
+  // Shuffle the deck before dealing
   const shuffled = shuffle(cards);
 
-  // Deal 7 cards to each player
+  // Deal 7 cards to each player + 1 Defuse
   const playerHands: Card[][] = [];
   for (let p = 0; p < playerCount; p++) {
     const hand = shuffled.splice(0, 7);
-    // Give each player 1 Defuse card
     hand.push(createCard('defuse'));
     playerHands.push(hand);
   }
 
-  // Add remaining Defuse cards (6 total - playerCount already dealt)
+  // Add remaining Defuse cards (6 total minus already dealt)
   const extraDefuses = Math.max(0, 6 - playerCount);
   for (let i = 0; i < extraDefuses; i++) {
     shuffled.push(createCard('defuse'));
@@ -76,14 +99,19 @@ function buildDeck(playerCount: number, expansionEnabled?: boolean): { deck: Car
     shuffled.push(createCard('exploding_kitten'));
   }
 
-  // Add 1 Imploding Kitten if expansion enabled
-  if (expansionEnabled) {
-    shuffled.push(createCard('imploding_kitten'));
+  // Add special cards from enabled packs (e.g. Imploding Kitten)
+  for (const packId of enabledPacks) {
+    const pack = getPackById(packId);
+    if (!pack?.specialCards) continue;
+    for (const { type, count } of pack.specialCards) {
+      const n = count(playerCount);
+      for (let i = 0; i < n; i++) {
+        shuffled.push(createCard(type));
+      }
+    }
   }
 
-  // Shuffle the final deck
   const finalDeck = shuffle(shuffled);
-
   return { deck: finalDeck, playerHands };
 }
 
@@ -97,7 +125,9 @@ export function createGame(options: {
   aiDifficulty?: AIDifficulty;
   bestOf?: 3 | 5;
   existingSeries?: SeriesState;
+  /** @deprecated Use enabledPacks instead */
   expansionEnabled?: boolean;
+  enabledPacks?: string[];
 }): GameState {
   const code = nanoid(6).toUpperCase();
   const players: Player[] = [
@@ -149,6 +179,8 @@ export function createGame(options: {
     };
   }
 
+  const resolvedPacks = normalizePacks(options.enabledPacks, options.expansionEnabled);
+
   const game: GameState = {
     id: nanoid(12),
     code,
@@ -166,9 +198,12 @@ export function createGame(options: {
     isMultiplayer: options.isMultiplayer,
     hostId: options.hostId,
     lastActionId: 0,
-    expansionEnabled: options.expansionEnabled,
+    expansionEnabled: resolvedPacks.includes('imploding_kittens'), // keep for backward compat
+    enabledPacks: resolvedPacks,
     playDirection: 1,
     series,
+    actionLog: [],
+    currentTurnNumber: 1,
   };
 
   return game;
@@ -178,7 +213,7 @@ export function startGame(game: GameState): GameState {
   const playerCount = game.players.length;
   if (playerCount < 2) throw new Error('Need at least 2 players');
 
-  const { deck, playerHands } = buildDeck(playerCount, game.expansionEnabled);
+  const { deck, playerHands } = buildDeck(playerCount, normalizePacks(game.enabledPacks, game.expansionEnabled));
 
   const players = game.players.map((p, i) => ({
     ...p,
@@ -206,6 +241,15 @@ export function startGame(game: GameState): GameState {
     });
   }
 
+  const startRecord: ActionRecord = {
+    seq: 1,
+    turnNumber: 1,
+    timestamp: Date.now(),
+    type: 'game_start',
+    playerId: game.hostId,
+    playerName: players.find(p => p.id === game.hostId)?.name ?? 'Host',
+  };
+
   return {
     ...game,
     status: 'playing',
@@ -219,6 +263,8 @@ export function startGame(game: GameState): GameState {
     updatedAt: Date.now(),
     lastActionId: game.lastActionId + 1,
     series,
+    actionLog: [startRecord],
+    currentTurnNumber: 1,
   };
 }
 
@@ -333,8 +379,21 @@ function executeNopeableAction(state: GameState, action: GameAction, cardPlayed:
       if (state.deck.length === 0) break;
       const drawnCard = state.deck.pop()!;
       if (drawnCard.type === 'exploding_kitten') {
+        const streakingIdx = player.hand.findIndex(c => c.type === 'streaking_kitten');
         const defuseIndex = player.hand.findIndex(c => c.type === 'defuse');
-        if (defuseIndex !== -1) {
+        if (streakingIdx !== -1 && defuseIndex === -1) {
+          // Streaking Kitten shields from bottom draw too
+          player.hand.splice(streakingIdx, 1);
+          state.discardPile.push(createCard('streaking_kitten'));
+          const randPos = Math.floor(Math.random() * (state.deck.length + 1));
+          state.deck.splice(randPos, 0, drawnCard);
+          state.logs.push({ message: `💨 ${player.name} drew an Exploding Kitten from the bottom but their Streaking Kitten shielded them!`, timestamp: Date.now(), playerId: player.id });
+          state.turnsRemaining--;
+          if (state.turnsRemaining <= 0) {
+            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+            state.turnsRemaining = 1;
+          }
+        } else if (defuseIndex !== -1) {
           state.pendingAction = { type: 'defuse_place', playerId: player.id, cardPlayed: 'exploding_kitten' };
           player.hand.splice(defuseIndex, 1);
           state.discardPile.push(createCard('defuse'));
@@ -393,14 +452,19 @@ function executeNopeableAction(state: GameState, action: GameAction, cardPlayed:
 
 export function resolveNopeWindow(game: GameState): GameState {
   if (!game.pendingAction || game.pendingAction.type !== 'nope_window') return game;
-  let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs] };
+  let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs], actionLog: [...(game.actionLog ?? [])] };
 
+  const startPlayerIndex = state.currentPlayerIndex;
   const nopeCount = state.pendingAction!.nopeChain?.length ?? 0;
   const originalAction = state.pendingAction!.originalAction!;
   const cardPlayed = state.pendingAction!.cardPlayed!;
+  const nopeChainIds = state.pendingAction!.nopeChain ?? [];
+
   state.pendingAction = null;
 
-  if (nopeCount % 2 === 1) {
+  const outcome = nopeCount % 2 === 1 ? 'noped' : 'executed';
+
+  if (outcome === 'noped') {
     // Odd nopes = action cancelled
     const player = state.players.find(p => p.id === originalAction.playerId);
     state.logs.push({ message: `${player?.name}'s ${cardPlayed.replace(/_/g, ' ')} was Noped!`, timestamp: Date.now(), playerId: originalAction.playerId });
@@ -409,14 +473,27 @@ export function resolveNopeWindow(game: GameState): GameState {
     state = executeNopeableAction(state, originalAction, cardPlayed);
   }
 
+  // Record the nope resolution with full chain
+  pushAction(state, {
+    type: 'nope_resolved',
+    playerId: originalAction.playerId,
+    playerName: state.players.find(p => p.id === originalAction.playerId)?.name ?? '',
+    cardType: cardPlayed,
+    nopeChain: nopeChainIds.map(id => ({ playerId: id, playerName: state.players.find(p => p.id === id)?.name ?? id })),
+    nopedCardType: cardPlayed,
+    outcome,
+  });
+
+  maybeBumpTurnNumber(state, startPlayerIndex);
   state.updatedAt = Date.now();
   state.lastActionId++;
   return state;
 }
 
 export function processAction(game: GameState, action: GameAction): GameState {
-  let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs] };
+  let state = { ...game, players: game.players.map(p => ({ ...p, hand: [...p.hand] })), deck: [...game.deck], discardPile: [...game.discardPile], logs: [...game.logs], actionLog: [...(game.actionLog ?? [])] };
 
+  const startPlayerIndex = state.currentPlayerIndex;
   const player = state.players.find(p => p.id === action.playerId);
   if (!player) throw new Error('Player not found');
   if (!player.isAlive) throw new Error('Player is eliminated');
@@ -450,6 +527,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
           cardPlayed: card.type,
         };
         state.logs.push({ message: `${player.name} played a pair of ${pairLabel}s!`, timestamp: Date.now(), playerId: player.id });
+        pushAction(state, { type: 'card_played', playerId: player.id, playerName: player.name, cardType: card.type, cardCount: 2 });
         break;
       }
 
@@ -477,6 +555,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
           cardPlayed: card.type,
         };
         state.logs.push({ message: `${player.name} played three ${tripleLabel}s!`, timestamp: Date.now(), playerId: player.id });
+        pushAction(state, { type: 'card_played', playerId: player.id, playerName: player.name, cardType: card.type, cardCount: 3 });
         break;
       }
 
@@ -495,6 +574,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
         state.pendingAction!.passedPlayerIds = []; // Reset passes for new nope window
         state.pendingAction!.expiresAt = Date.now() + NOPE_WINDOW_MS;
         state.logs.push({ message: `${player.name} played Nope! (${state.pendingAction!.nopeChain.length} in chain)`, timestamp: Date.now(), playerId: player.id });
+        pushAction(state, { type: 'nope_played', playerId: player.id, playerName: player.name, cardType: 'nope' });
         // Check if anyone else can counter-nope
         if (!canAnyoneNope(state, player.id)) {
           // No one can counter — resolve immediately
@@ -503,6 +583,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
       } else if (isNopeableCard(card.type)) {
         // Nopeable card — create a nope window instead of executing immediately
         state.logs.push({ message: `${player.name} played ${card.type.replace(/_/g, ' ')}!`, timestamp: Date.now(), playerId: player.id });
+        pushAction(state, { type: 'card_played', playerId: player.id, playerName: player.name, cardType: card.type, cardCount: 1 });
         state = createNopeWindow(state, action, card.type);
       } else {
         if (isCatCard(card.type)) {
@@ -529,6 +610,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
           state.discardPile.push(drawnCard, ...player.hand);
           player.hand = [];
           state.logs.push({ message: `☢️ ${player.name} drew the face-up Imploding Kitten and IMPLODED!`, timestamp: Date.now(), playerId: player.id });
+          pushAction(state, { type: 'implode', playerId: player.id, playerName: player.name, cardType: 'imploding_kitten' });
 
           const alivePlayers = state.players.filter(p => p.isAlive);
           if (alivePlayers.length === 1) {
@@ -555,9 +637,25 @@ export function processAction(game: GameState, action: GameAction): GameState {
           state.logs.push({ message: `☢️ ${player.name} drew the Imploding Kitten! Place it back face-up in the deck.`, timestamp: Date.now(), playerId: player.id });
         }
       } else if (drawnCard.type === 'exploding_kitten') {
-        // Check for Defuse
+        // Streaking Kitten shield: auto-discard the SK and place EK back randomly (no Defuse needed)
+        const streakingIndex = player.hand.findIndex(c => c.type === 'streaking_kitten');
         const defuseIndex = player.hand.findIndex(c => c.type === 'defuse');
-        if (defuseIndex !== -1) {
+
+        if (streakingIndex !== -1 && defuseIndex === -1) {
+          // No Defuse — use Streaking Kitten as shield
+          player.hand.splice(streakingIndex, 1);
+          state.discardPile.push(createCard('streaking_kitten'));
+          const randPos = Math.floor(Math.random() * (state.deck.length + 1));
+          state.deck.splice(randPos, 0, drawnCard);
+          state.logs.push({ message: `💨 ${player.name} drew an Exploding Kitten but their Streaking Kitten shielded them! The EK was shuffled back.`, timestamp: Date.now(), playerId: player.id });
+          // End turn
+          state.turnsRemaining--;
+          if (state.turnsRemaining <= 0) {
+            state.currentPlayerIndex = getNextAlivePlayerIndex(state, state.currentPlayerIndex);
+            state.turnsRemaining = 1;
+          }
+        } else if (defuseIndex !== -1) {
+          // Check for Defuse
           state.pendingAction = {
             type: 'defuse_place',
             playerId: player.id,
@@ -613,6 +711,7 @@ export function processAction(game: GameState, action: GameAction): GameState {
       } else {
         player.hand.push(drawnCard);
         state.logs.push({ message: `${player.name} drew a card.`, timestamp: Date.now(), playerId: player.id });
+        pushAction(state, { type: 'draw', playerId: player.id, playerName: player.name });
 
         // End turn
         state.turnsRemaining--;

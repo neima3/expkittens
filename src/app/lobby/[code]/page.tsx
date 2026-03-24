@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { AVATARS } from '@/types/game';
 import type { Room, RoomPlayer } from '@/lib/rooms-db';
+import { EXPANSION_PACKS } from '@/lib/expansion-packs';
 import { getPersistentId } from '@/lib/identity';
 
 function CopyButton({ text }: { text: string }) {
@@ -124,7 +125,7 @@ export default function RoomPage() {
   const [joining, setJoining] = useState(false);
   const [starting, setStarting] = useState(false);
   const [togglingReady, setTogglingReady] = useState(false);
-  const [expansionEnabled, setExpansionEnabled] = useState(false);
+  const [enabledPacks, setEnabledPacks] = useState<string[]>([]);
 
   const lastEventIdRef = useRef(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -276,7 +277,7 @@ export default function RoomPage() {
       const res = await fetch(`/api/rooms/${code}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: myPlayerId, expansionEnabled }),
+        body: JSON.stringify({ playerId: myPlayerId, enabledPacks }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -499,29 +500,51 @@ export default function RoomPage() {
           {/* Host start button */}
           {isHost && (
             <div className="space-y-2">
-              {/* Expansion toggle */}
-              <button
-                onClick={() => setExpansionEnabled(v => !v)}
-                className={`w-full py-3 px-4 rounded-2xl text-left transition-all border-2 ${
-                  expansionEnabled
-                    ? 'border-[#7B2FBE] bg-[#7B2FBE]/15 text-[#cc88ff]'
-                    : 'border-border bg-surface-light/50 text-text-muted hover:border-border/80'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 ${
-                    expansionEnabled ? 'border-[#7B2FBE] bg-[#7B2FBE]' : 'border-border'
-                  }`}>
-                    {expansionEnabled && <span className="text-white text-xs">✓</span>}
-                  </div>
-                  <div>
-                    <p className={`font-black text-sm uppercase tracking-wider mb-0.5 ${expansionEnabled ? 'text-[#a855f7]' : ''}`}>
-                      ☢️ Imploding Kittens Expansion
-                    </p>
-                    <p className="text-xs opacity-70">Adds Imploding Kitten, Reverse, Draw from Bottom &amp; Feral Cat</p>
-                  </div>
+              {/* Expansion pack toggles */}
+              <div>
+                <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 px-1">
+                  Expansion Packs
+                </p>
+                <div className="space-y-2">
+                  {EXPANSION_PACKS.map(pack => {
+                    const active = enabledPacks.includes(pack.id);
+                    return (
+                      <button
+                        key={pack.id}
+                        onClick={() =>
+                          setEnabledPacks(prev =>
+                            active ? prev.filter(id => id !== pack.id) : [...prev, pack.id]
+                          )
+                        }
+                        style={active ? { borderColor: pack.color, background: `${pack.color}18` } : undefined}
+                        className={`w-full py-3 px-4 rounded-2xl text-left transition-all border-2 ${
+                          active
+                            ? ''
+                            : 'border-border bg-surface-light/50 text-text-muted hover:border-border/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-5 h-5 rounded flex items-center justify-center border-2 shrink-0 transition-colors`}
+                            style={active ? { borderColor: pack.color, background: pack.color } : { borderColor: 'var(--color-border)' }}
+                          >
+                            {active && <span className="text-white text-xs">✓</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className="font-black text-sm uppercase tracking-wider mb-0.5"
+                              style={active ? { color: pack.color } : undefined}
+                            >
+                              {pack.emoji} {pack.name}
+                            </p>
+                            <p className="text-xs opacity-70 truncate">{pack.cardSummary}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
+              </div>
               <motion.button
                 whileHover={canStart ? { scale: 1.02, boxShadow: '0 20px 40px rgba(255,95,46,0.4)' } : {}}
                 whileTap={canStart ? { scale: 0.97 } : {}}

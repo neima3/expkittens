@@ -12,7 +12,11 @@ export async function POST(
     await initializeRoomsTable();
     const { code } = await params;
     const body = await req.json();
-    const { playerId, expansionEnabled } = body;
+    const { playerId, enabledPacks, expansionEnabled } = body;
+    // Resolve packs: prefer enabledPacks array, fall back to legacy boolean
+    const resolvedPacks: string[] = Array.isArray(enabledPacks)
+      ? enabledPacks
+      : expansionEnabled === true ? ['imploding_kittens'] : [];
 
     if (!playerId) {
       return NextResponse.json({ error: 'playerId required' }, { status: 400 });
@@ -47,7 +51,7 @@ export async function POST(
       hostPersistentId: host.persistentId,
       isMultiplayer: true,
       aiCount: 0,
-      expansionEnabled: expansionEnabled === true,
+      enabledPacks: resolvedPacks,
     });
 
     // Add the remaining ready players (skip host, already in game)
